@@ -24,6 +24,10 @@
     "webpack-merge": "^5.8.0"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "@types/audioworklet": "^0.0.35",
+    "@types/meyda": "^4.3.2",
+    "essentia.js": "^0.1.3",
+    "express": "^4.18.2",
+    "meyda": "^5.5.1"
   }
 }
