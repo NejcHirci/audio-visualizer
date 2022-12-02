@@ -2,9 +2,10 @@ import * as React from "react";
 import {useFrame, useLoader} from "@react-three/fiber";
 import * as THREE from "three";
 import circleImg from "../assets/circle.png";
-import {useCallback, useMemo, useRef} from "react";
+import { useCallback, useContext, useMemo, useRef } from 'react'
 import { Color, Spherical, Vector3 } from 'three'
-import { lerp, randFloat, randInt } from 'three/src/math/MathUtils'
+import { lerp, mapLinear, randFloat, randInt } from 'three/src/math/MathUtils'
+import { ProjectStoreContext } from '../App'
 
 
 
@@ -17,8 +18,15 @@ import { lerp, randFloat, randInt } from 'three/src/math/MathUtils'
  * **/
 
 export const MandelBulb = () => {
+    const store = useContext(ProjectStoreContext);
     const pointsBufferRef = useRef(null);
     const colorBufferRef = useRef(null);
+
+    useFrame((state, delta) => {
+        if (store && store.analyser) {
+            store.updateArray();
+        }
+    });
 
     const DIM = 128;
 
@@ -29,54 +37,55 @@ export const MandelBulb = () => {
 
         for (let i = 0; i < DIM; i++) {
             for (let j = 0; j < DIM; j++) {
+                let edge = false;
                 for (let k = 0; k < DIM; k++) {
-
-                    // We want to keep initial x, y, z between -1 and 1
-                    let x = (i - DIM / 2) / (DIM / 2);
-                    let y = (j - DIM / 2) / (DIM / 2);
-                    let z = (k - DIM / 2) / (DIM / 2);
+                    // We want to keep initial x, y, z between -0.5 and 0.5
+                    let x = mapLinear(i, 0, DIM, -1, 1);
+                    let y = mapLinear(j, 0, DIM, -1, 1);
+                    let z = mapLinear(k, 0, DIM, -1, 1);
 
                     let zeta = new Vector3(0, 0,0);
                     let spherical = new Spherical();
 
                     let n = 8;
-                    let maxiterations = 20;
+                    let maxiterations = 30;
                     let iteration = 0;
-                    while (iteration <= maxiterations) {
+
+                    while (true) {
+                        spherical = new Spherical();
                         spherical.setFromCartesianCoords(zeta.x, zeta.y, zeta.z);
                         let newx = Math.pow(spherical.radius, n) * Math.sin(spherical.theta * n) * Math.cos(spherical.phi * n);
                         let newy = Math.pow(spherical.radius, n) * Math.sin(spherical.theta * n) * Math.sin(spherical.phi * n);
                         let newz = Math.pow(spherical.radius, n) * Math.cos(spherical.theta * n);
+
                         zeta.x = newx + x;
                         zeta.y = newy + y;
                         zeta.z = newz + z;
 
                         iteration++;
 
-                        if (spherical.radius > 16) { break; }
+                        if (spherical.radius > 2) {
+                            if (edge) { edge = false; }
+                            break;
+                        }
 
                         if (iteration > maxiterations) {
-                            arr.push(100 * zeta.x, 100 * zeta.y, 100 * zeta.z);
+                            if (!edge) {
+                                edge = true;
+                                arr.push(100 * x, 100 * y, 100 * z);
+                            }
+                            break;
                         }
                     }
                 }
             }
         }
 
-        let maxRadius = 0;
-
         for (let i=0; i < arr.length; i+=3) {
             let x = arr[i];
             let y = arr[i];
             let z = arr[i];
-            maxRadius = Math.max(maxRadius, Math.sqrt(x*x + y*y + z*z));
-        }
-
-        for (let i=0; i < arr.length; i+=3) {
-            let x = arr[i];
-            let y = arr[i];
-            let z = arr[i];
-            let alpha = Math.sqrt(x * x + y * y + z * z) / 300;
+            let alpha = Math.sqrt(x * x + y * y + z * z) / 200;
             color.lerpColors(new Color('red'), new Color('green'), alpha);
             colors.push(color.r, color.g, color.b);
         }
