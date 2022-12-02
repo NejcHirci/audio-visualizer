@@ -3,7 +3,8 @@ import {useFrame, useLoader} from "@react-three/fiber";
 import * as THREE from "three";
 import circleImg from "../assets/circle.png";
 import {useCallback, useMemo, useRef} from "react";
-import {Spherical, Vector3} from "three";
+import { Color, Spherical, Vector3 } from 'three'
+import { lerp, randFloat, randInt } from 'three/src/math/MathUtils'
 
 
 
@@ -16,14 +17,15 @@ import {Spherical, Vector3} from "three";
  * **/
 
 export const MandelBulb = () => {
-    const imgTex = useLoader(THREE.TextureLoader, circleImg);
-    const bufferRef = useRef(null);
+    const pointsBufferRef = useRef(null);
+    const colorBufferRef = useRef(null);
 
-    const DIM = 64;
-    const dist = 3;
+    const DIM = 128;
 
-    let positions = useMemo(() => {
+    let [positions, colors] = useMemo(() => {
         let arr = [];
+        let colors = [];
+        const color = new THREE.Color();
 
         for (let i = 0; i < DIM; i++) {
             for (let j = 0; j < DIM; j++) {
@@ -60,26 +62,51 @@ export const MandelBulb = () => {
                 }
             }
         }
-        console.log(arr);
 
-        return new Float32Array(arr);
+        let maxRadius = 0;
+
+        for (let i=0; i < arr.length; i+=3) {
+            let x = arr[i];
+            let y = arr[i];
+            let z = arr[i];
+            maxRadius = Math.max(maxRadius, Math.sqrt(x*x + y*y + z*z));
+        }
+
+        for (let i=0; i < arr.length; i+=3) {
+            let x = arr[i];
+            let y = arr[i];
+            let z = arr[i];
+            let alpha = Math.sqrt(x * x + y * y + z * z) / 300;
+            color.lerpColors(new Color('red'), new Color('green'), alpha);
+            colors.push(color.r, color.g, color.b);
+        }
+
+
+
+        return [new Float32Array(arr), new Float32Array(colors)];
     } , []);
 
     return (
         <points>
             <bufferGeometry attach={"geometry"}>
                 <bufferAttribute
-                    ref={bufferRef}
+                    ref={pointsBufferRef}
                     attachObject={['attributes', 'position']}
                     array={positions}
                     count={positions.length / 3}
                     itemSize={3}
                 />
+                <bufferAttribute
+                    ref={colorBufferRef}
+                    attachObject={['attributes', 'color']}
+                    array={colors}
+                    count = {colors.length / 3}
+                    itemSize={3}
+                />
             </bufferGeometry>
             <pointsMaterial
                 attach={"material"}
-                map={imgTex}
-                color={0x00AAFF}
+                vertexColors={true}
                 size={0.5}
                 sizeAttenuation={true}
                 transparent={false}
