@@ -23,12 +23,14 @@ export class ProjectStore {
   loadAudio(audioRef: MutableRefObject<any>, url:File) {
     this.audioRef = audioRef;
 
+    if (!this.source) {
+      this.context = new AudioContext();
+      this.source = this.context.createMediaElementSource(this.audioRef.current);
+    }
+
     console.log("STORE loading audio AUDIO");
 
     this.audioRef.current.src = URL.createObjectURL(url);
-    this.context = new AudioContext();
-    this.source = this.context.createMediaElementSource(this.audioRef.current);
-
     this.analyser = this.context.createAnalyser();
     this.source.connect(this.analyser);
     this.analyser.connect(this.context.destination);
@@ -39,6 +41,5 @@ export class ProjectStore {
 
   updateArray() {
     this.analyser.getByteFrequencyData(this.dataArray);
-    console.log(this.dataArray);
   }
 }

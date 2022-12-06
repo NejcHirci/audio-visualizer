@@ -28,7 +28,20 @@ export const MandelBulb = () => {
         }
     });
 
-    const DIM = 128;
+    const DIM = 32;
+
+    useFrame(() => {
+        // We want to simply move position by a small amount in or out from the
+        // direction of the center
+        if (store.dataArray) {
+            for (let i = 0; i < positions.length; i += 3) {
+                let val = store.dataArray[Math.floor(i / 3) % store.dataArray.length];
+                console.log(store.dataArray);
+                pointsBufferRef.current.array[i] += randInt(-1, 1);
+            }
+            pointsBufferRef.current.needsUpdate = true;
+        }
+    });
 
     let [positions, colors] = useMemo(() => {
         let arr = [];
