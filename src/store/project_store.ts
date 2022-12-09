@@ -15,8 +15,14 @@ export class ProjectStore {
   dataArray : Uint8Array;
 
   constructor(audioRef?:MutableRefObject<any>, fftSize?:number) {
-    if (audioRef) this.audioRef = audioRef;
+    if (audioRef) {
+      this.audioRef = audioRef;
+      this.source = this.context.createMediaElementSource(this.audioRef.current);
+    }
+
     if (fftSize) this.fftSize = fftSize;
+
+    this.context = new AudioContext();
     makeAutoObservable(this);
   }
 
@@ -24,11 +30,8 @@ export class ProjectStore {
     this.audioRef = audioRef;
 
     if (!this.source) {
-      this.context = new AudioContext();
       this.source = this.context.createMediaElementSource(this.audioRef.current);
     }
-
-    console.log("STORE loading audio AUDIO");
 
     this.audioRef.current.src = URL.createObjectURL(url);
     this.analyser = this.context.createAnalyser();
