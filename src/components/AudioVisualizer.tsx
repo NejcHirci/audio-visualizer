@@ -5,8 +5,7 @@ import { ProjectStoreContext } from '../App'
 // Create appropriate JSX component from js
 import { Canvas, extend, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import { MandelBulb } from './MandelBulb'
-import { BasicSphere } from './BasicSphere'
+import { RayMarched_MandelBulb } from './RayMarched_MandelBulb'
 
 
 export const AudioVisualizer = () => {
@@ -33,22 +32,18 @@ const CameraControls = () => {
     <orbitControls
       ref={controlsRef}
       args={[ camera, domElement ]}
-      autoRotate={true}
-      autoRotateSpeed={-0.2}
+      autoRotate={false}
     />
   )
 }
 
 const AnimationCanvas = () => {
   return (
-    <Canvas camera={{position: [100, 10, 0], fov: 75}}>
-      <color attach="background" args={['black']} />
-      <Suspense fallback={null}>
-        <ambientLight intensity={0.1}/>
-        <pointLight position={[100, 20, 10]} intensity={1.5} />
-        <BasicSphere/>
-      </Suspense>
+    <Canvas camera={{position: [0, 2, -2]}}>
       <CameraControls/>
+      <Suspense fallback={null}>
+        <RayMarched_MandelBulb/>
+      </Suspense>
     </Canvas>
   )
 

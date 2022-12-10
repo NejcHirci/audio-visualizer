@@ -9,6 +9,7 @@ const InterfaceWrapper = styled.div`
   position: absolute;
   top: 1rem;
   left: 1rem;
+  background: rgba(255, 255, 255, 0.1);
 `
 
 export const UserInterface = () => {

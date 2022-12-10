@@ -1,5 +1,6 @@
 import { makeAutoObservable } from 'mobx'
 import { MutableRefObject } from 'react'
+import { DataTexture2DArray } from 'three'
 
 export class ProjectStore {
 
@@ -11,8 +12,12 @@ export class ProjectStore {
   analyser : AnalyserNode;
 
   // Data
-  fftSize : number = 512;
+  fftSize : number = 128;
   dataArray : Uint8Array;
+
+  // 2D Buffer Array;
+  dataTexture : DataTexture2DArray
+
 
   constructor(audioRef?:MutableRefObject<any>, fftSize?:number) {
     if (audioRef) {
