@@ -64,7 +64,7 @@ export default `
     float dr = 1.0;
     float r = 0.0;
     int iterations = 0;
-    float power = 8.0 + 1.0 * sin(iTime * PI / 10.);
+    float power = 8.0;
   
     for (int i = 0; i < 7; i++) {
       iterations = i;
@@ -81,9 +81,13 @@ export default `
   
       // scale and rotate the point
       float fftVal = fftData[int(r * 64.)] / 64.;
-      float zr = pow (r, power) * (1. + map(sin(midFFT / 128.), -1., 1., 0., 1.));
+      float zr = pow (r, power);
       theta = theta * power ;
       phi = phi * power;
+      
+      theta = theta + map((lowFFT + midFFT + highFFT) / (64. * 3.), 0., 1., 0., 2. * PI);
+      
+      
   
       // convert back to cartesian coordinates
       z = zr * vec3 (sin (theta) * cos (phi), sin (phi) * sin (theta), cos (theta));
@@ -94,10 +98,24 @@ export default `
     return dst;
   }
   
+  // Audio sphere to smoothmin with Mandelbulb
+  float sdSphere( vec3 p, float s ) {
+    return length(p)-s;
+  }
+  
+  // polynomial smooth min
+  float smin( float a, float b ) {
+    float k = 0.1;
+    float h = clamp( 0.5 + 0.5*(b-a)/k, 0.0, 1.0 );
+    return mix( b, a, h ) - k*h*(1.0-h);
+  }
+  
   // Calculates de distance from a position p to the scene
   float DistanceEstimator (vec3 p) {
-    float mandelbulb = mandelbulb (p);
-    return mandelbulb;
+    
+    float mandelbulb = mandelbulb(p);
+    float sphere = sdSphere(p, 10.0);
+    return sphere;
   }
   
   // Marches the ray in the scene

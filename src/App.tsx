@@ -17,7 +17,7 @@ const App = () => {
     <ProjectStoreContext.Provider value={projectStore}>
       <div className={'anim'}>
         <AudioVisualizer/>
-        <UserInterface/>
+        {/*<UserInterface/>*/}
       </div>
     </ProjectStoreContext.Provider>
   )
