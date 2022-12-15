@@ -33,30 +33,30 @@ export const RayMarched_MandelBulb = () => {
     fftData: { value: new Float32Array(64)},
     lowFFT: { value: 0.0 },
     midFFT: { value: 0.0 },
-    highFFT: { value: 0.0 }
+    highFFT: { value: 0.0 },
+    offsetTheta: {value: 0.0},
+    bpm: { value: 0.0}
   }), []);
 
 
   useFrame((state, delta) => {
-    meshRef.current.material.uniforms.iRayOrigin.value = camera.position;
+    let activeUniforms = meshRef.current.material.uniforms;
+    activeUniforms.iRayOrigin.value = camera.position;
 
     if (store.analyser && !store.audioRef.current.paused) {
-      meshRef.current.material.uniforms.iTime.value += delta;
+      activeUniforms.iTime.value += delta;
+      activeUniforms.offsetTheta.value =
+        (activeUniforms.offsetTheta.value * store.bpm / 60.0 + delta) % (2 * Math.PI);
+      activeUniforms.bpm.value = store.bpm;
+
       store.updateArray();
+      store.updateAnalytics();
 
-      let m1 = Math.round(store.analyser.frequencyBinCount / 3);
-      let m2 = Math.round(store.analyser.frequencyBinCount * 2 / 3);
-      let m3 = store.analyser.frequencyBinCount
-
-      if (max(store.dataArray) > 0.0) {
-        let lowFFT = mapLinear(avg(store.dataArray.slice(0, m1)), min(store.dataArray.slice(0, m1)), max(store.dataArray.slice(0, m1)), 0.9, 1.5);
-        let midFFT = mapLinear(avg(store.dataArray.slice(m1, m2)), min(store.dataArray.slice(m1, m2)), max(store.dataArray.slice(m1, m2)), 0.9, 1.5);
-        let highFFT = mapLinear(avg(store.dataArray.slice(m2, m3)), min(store.dataArray.slice(m2, m3)), max(store.dataArray.slice(m2, m3)), 0.9, 1.5);
-
-        meshRef.current.material.uniforms.lowFFT.value = !isNaN(lowFFT) ? lowFFT : 0.0;
-        meshRef.current.material.uniforms.midFFT.value = !isNaN(midFFT) ? midFFT : 0.0;
-        meshRef.current.material.uniforms.highFFT.value = !isNaN(highFFT) ? highFFT : 0.0;
-        meshRef.current.material.uniforms.fftData.value = new Float32Array(store.dataArray);
+      if (store.lowFFT+store.midFFT+store.highFFT > 0.0) {
+        activeUniforms.lowFFT.value = 0.5*activeUniforms.lowFFT.value+store.lowFFT*0.5;
+        activeUniforms.midFFT.value = 0.5*activeUniforms.midFFT.value+store.midFFT*0.5;
+        activeUniforms.highFFT.value = 0.5*activeUniforms.highFFT.value+store.highFFT*0.5;
+        activeUniforms.fftData.value = store.getSmoothArray();
       }
     }
   });
@@ -77,15 +77,5 @@ export const RayMarched_MandelBulb = () => {
   );
 }
 
-function avg(arr:Uint8Array) {
-  return arr.reduce((p, c) => p+c, 0);
-}
 
-function max(arr:Uint8Array) {
-  return arr.reduce((a, b) => a > b ? a : b);
-}
-
-function min(arr:Uint8Array) {
-  return arr.reduce((a, b) => a < b ? a : b);
-}
 

@@ -4,7 +4,13 @@
     "noImplicitAny": true,
     "removeComments": true,
     "sourceMap": true,
-    "jsx": "react"
+    "jsx": "react",
+    "lib": [
+      "dom",
+      "es5",
+      "scripthost",
+      "webworker"
+    ]
   },
   "include": [
     "src/**/*"

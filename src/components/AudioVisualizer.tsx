@@ -39,7 +39,7 @@ const CameraControls = () => {
 
 const AnimationCanvas = () => {
   return (
-    <Canvas camera={{position: [0, 2, -2]}}>
+    <Canvas camera={{position: [0, 3, 0]}}>
       <CameraControls/>
       <Suspense fallback={null}>
         <RayMarched_MandelBulb/>
