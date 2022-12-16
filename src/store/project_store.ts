@@ -3,7 +3,7 @@ import { MutableRefObject } from 'react'
 import { DataTexture2DArray } from 'three'
 import { mapLinear } from 'three/src/math/MathUtils'
 import { analyze } from 'web-audio-beat-detector';
-import * as Tone from 'tone';
+import * as Tone from 'tone'
 
 
 export class ProjectStore {
@@ -14,6 +14,7 @@ export class ProjectStore {
   // Nodes
   source : MediaElementAudioSourceNode;
   analyser : AnalyserNode;
+  gain : GainNode;
 
   // Data
   fftSize : number = 512;
@@ -44,12 +45,12 @@ export class ProjectStore {
     }
     this.context = new AudioContext();
     Tone.setContext(this.context);
-    this.chorus = new Tone.Chorus(4, 2.5, 0.5);
-    this.tremolo = new Tone.Tremolo(9, 0.75);
+    this.chorus = new Tone.Chorus({frequency: 6, delayTime: 0.5, depth: 0.5});
+    this.tremolo = new Tone.Tremolo({ frequency: 12, depth: 0.9});
     this.phaser = new Tone.Phaser({
-      "frequency" : 15,
-      "octaves" : 5,
-      "baseFrequency" : 1000
+      frequency : 15,
+      octaves : 5,
+      baseFrequency : 500
     });
     this.isChorus = false;
     this.isTremolo = false;
@@ -62,14 +63,16 @@ export class ProjectStore {
 
     if (!this.source) {
       this.source = this.context.createMediaElementSource(this.audioRef.current);
+      this.gain = this.context.createGain();
+      this.gain.gain.value = 0.5;
     } else {
       this.source = this.context.createMediaElementSource(this.audioRef.current);
     }
 
     this.audioRef.current.src = URL.createObjectURL(url);
     this.analyser = this.context.createAnalyser();
-    this.source.connect(this.analyser);
-
+    this.source.connect(this.gain);
+    this.gain.connect(this.analyser);
     this.analyser.connect(this.context.destination);
 
     this.analyser.fftSize = this.fftSize;
@@ -117,63 +120,49 @@ export class ProjectStore {
     return newArray;
   }
 
-  // Audio Effects to Add
-  toggleChorus() {
-    if (this.isChorus) {
-      Tone.disconnect(this.source, this.chorus);
-      Tone.disconnect(this.chorus, this.analyser);
-      this.source.connect(this.analyser);
-
-    } else {
-      Tone.connect(this.source, this.chorus);
-      Tone.connect(this.chorus, this.analyser);
-    }
-    this.isChorus = !this.isChorus;
-  }
-
   updateChorus(f:number, delay:number, depth:number) {
     if (this.isChorus) {
       Tone.disconnect(this.source, this.chorus);
-      Tone.disconnect(this.chorus, this.analyser);
-      this.source.connect(this.analyser);
+      Tone.disconnect(this.chorus, this.gain);
+      this.source.connect(this.gain);
       this.isChorus = false;
     }
     // Create new
-    this.chorus = new Tone.Chorus(f, delay, depth);
+    this.chorus = new Tone.Chorus({frequency: f, delayTime: delay, depth: depth});
   }
 
   updatePhaser(f:number, octaves:number, baseF:number) {
     if (this.isPhaser) {
       Tone.disconnect(this.source, this.phaser);
-      Tone.disconnect(this.phaser, this.analyser);
-      this.source.connect(this.analyser);
+      Tone.disconnect(this.phaser, this.gain);
+      this.source.connect(this.gain);
       this.isPhaser = false;
     }
     // Create new
-    this.phaser = new Tone.Phaser(f, octaves, baseF);
+    this.phaser = new Tone.Phaser({frequency: f, octaves: octaves, baseFrequency: baseF});
 
   }
 
   updateTremolo(f:number, depth:number) {
     if (this.isTremolo) {
       Tone.disconnect(this.source, this.tremolo);
-      Tone.disconnect(this.tremolo, this.analyser);
-      this.source.connect(this.analyser);
+      Tone.disconnect(this.tremolo, this.gain);
+      this.source.connect(this.gain);
       this.isTremolo = false;
     }
 
     // Create new
-    this.tremolo = new Tone.Tremolo(f, depth);
+    this.tremolo = new Tone.Tremolo({frequency:f, depth:depth, wet:0.5});
   }
 
   togglePhaser() {
     if (this.isPhaser) {
       Tone.disconnect(this.source, this.phaser);
-      Tone.disconnect(this.phaser, this.analyser);
-      this.source.connect(this.analyser);
+      Tone.disconnect(this.phaser, this.gain);
+      this.source.connect(this.gain);
     } else {
       Tone.connect(this.source, this.phaser);
-      Tone.connect(this.phaser, this.analyser);
+      Tone.connect(this.phaser, this.gain);
     }
     this.isPhaser = !this.isPhaser;
   }
@@ -181,13 +170,27 @@ export class ProjectStore {
   toggleTremolo() {
     if (this.isTremolo) {
       Tone.disconnect(this.source, this.tremolo);
-      Tone.disconnect(this.tremolo, this.analyser);
-      this.source.connect(this.analyser);
+      Tone.disconnect(this.tremolo, this.gain);
+      this.source.connect(this.gain);
     } else {
       Tone.connect(this.source, this.tremolo);
-      Tone.connect(this.tremolo, this.analyser);
+      Tone.connect(this.tremolo, this.gain);
     }
     this.isTremolo = !this.isTremolo;
+  }
+
+  // Audio Effects to Add
+  toggleChorus() {
+    if (this.isChorus) {
+      Tone.disconnect(this.source, this.chorus);
+      Tone.disconnect(this.chorus, this.gain);
+      this.source.connect(this.gain);
+
+    } else {
+      Tone.connect(this.source, this.chorus);
+      Tone.connect(this.chorus, this.gain);
+    }
+    this.isChorus = !this.isChorus;
   }
 
 

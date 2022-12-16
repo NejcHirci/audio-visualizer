@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import * as React from 'react'
 import styled from 'styled-components'
+import value from '*.glsl'
+import { observer } from 'mobx-react-lite'
 
 
 
@@ -54,12 +56,12 @@ interface ToggleProps {
   onClick: () => void
 }
 
-export const ToggleButton = ({label, toggled, onClick}:ToggleProps) => {
+export const ToggleButton = observer(({label, toggled, onClick}:ToggleProps) => {
   return (
     <ToggleWrapper>
-      <input type={"checkbox"} defaultChecked={toggled} onClick={onClick}/>
+      <input type={"checkbox"} checked={toggled} onChange={onClick}/>
       <span />
       <strong>{label}</strong>
     </ToggleWrapper>
   );
-}
+});

@@ -4,7 +4,8 @@ import { MutableRefObject, useCallback, useContext, useEffect, useRef, useState 
 import { ProjectStoreContext } from '../App'
 import { set } from 'mobx'
 import { ToggleButton } from './components/toggle'
-import { mapLinear } from 'three/src/math/MathUtils'
+import { mapLinear, randInt } from 'three/src/math/MathUtils'
+import { observer } from "mobx-react-lite"
 
 const InterfaceWrapper = styled.div`
   display: grid;
@@ -22,7 +23,7 @@ const Dashboard = styled.div`
   justify-self: end;
   pointer-events: visible;
   min-width: 10px;
-  max-width: 40%;
+  max-width: 25%;
   display: flex;
   border-left: #e9e9e9 1px solid;
   color: black;
@@ -92,7 +93,7 @@ const Divider = styled.div`
   border: black solid 1px;
 `
 
-export const UserInterface = () => {
+export const UserInterface = observer(() => {
   const store = useContext(ProjectStoreContext)!;
   const audioRef = useRef(null);
 
@@ -112,14 +113,18 @@ export const UserInterface = () => {
           </label>
         </AudioSelect>
         <Divider/>
-        <ChorusEffect/>
-        <PhaserEffect/>
-        <TremoloEffect/>
+        { store.source !== undefined  &&
+          <>
+            <ChorusEffect/>
+            <PhaserEffect/>
+            <TremoloEffect/>
+          </>
+        }
       </ResizableDashBoard>
       <AudioPlayer ref={audioRef} id={'audioPlayer'} controls={true} />
     </InterfaceWrapper>
   )
-}
+});
 
 
 const EffectGroup = styled.div`
@@ -137,41 +142,41 @@ const EffectTitle = styled.h2`
 
 
 
-export const ChorusEffect = () => {
+export const ChorusEffect = observer(() => {
   const store = useContext(ProjectStoreContext)!;
   return (
     <div style={{display: 'flex', gap: '10px', flexDirection: 'column'}}>
       <EffectTitle>Chorus Effect</EffectTitle>
       <ToggleWrapper>
-        <input type={"checkbox"} defaultChecked={store.isChorus} onClick={() => store.toggleChorus()}/>
+        <input type={"checkbox"} checked={store.isChorus} onClick={() => store.toggleChorus()}/>
         <span />
       </ToggleWrapper>
       <EffectGroup>
-        <AudioEffect label={'Frequency'} maxValue={10} initialValue={4} onUpdate={(a) => {
+        <AudioEffect label={'Frequency'} maxValue={6} initialValue={0.1} onUpdate={(a) => {
           store.source && store.updateChorus(a, store.chorus.delayTime, store.chorus.depth);
         }}/>
-        <AudioEffect label={'Delay Time'} maxValue={3} initialValue={store.chorus.delayTime} onUpdate={(a) => {
+        <AudioEffect label={'Delay Time'} maxValue={35} initialValue={store.chorus.delayTime} onUpdate={(a) => {
           store.source && store.updateChorus(4, a, store.chorus.depth);
         }}/>
         <AudioEffect label={'Depth'} maxValue={1.0} initialValue={store.chorus.depth} onUpdate={(a) => {
-          store.source && store.updateChorus(4, store.chorus.delayTime, a);
+          store.source && store.updateChorus(0.1, store.chorus.delayTime, a);
         }}/>
       </EffectGroup>
     </div>
   );
-}
+});
 
-export const PhaserEffect = () => {
+export const PhaserEffect = observer(() => {
   const store = useContext(ProjectStoreContext)!;
   return (
     <div style={{display: 'flex', gap: '10px', flexDirection: 'column'}}>
       <EffectTitle>Phaser Effect</EffectTitle>
       <ToggleWrapper>
-        <input type={"checkbox"} defaultChecked={store.isPhaser} onClick={() => store.togglePhaser()}/>
+        <input type={"checkbox"} checked={store.isPhaser} onClick={() => store.togglePhaser()}/>
         <span />
       </ToggleWrapper>
       <EffectGroup>
-        <AudioEffect label={'Frequency'} maxValue={1} initialValue={0.5} onUpdate={(a) => {
+        <AudioEffect label={'Frequency'} maxValue={30} initialValue={15} onUpdate={(a) => {
           store.source && store.updatePhaser(a, store.phaser.octaves, 350);
         }}/>
         <AudioEffect label={'Octaves'} maxValue={3} initialValue={store.phaser.octaves} onUpdate={(a) => {
@@ -183,15 +188,15 @@ export const PhaserEffect = () => {
       </EffectGroup>
     </div>
   );
-}
+});
 
-export const TremoloEffect = () => {
+export const TremoloEffect = observer(() => {
   const store = useContext(ProjectStoreContext)!;
   return (
     <div style={{display: 'flex', gap: '10px', flexDirection: 'column'}}>
       <EffectTitle>Tremolo Effect</EffectTitle>
       <ToggleWrapper>
-        <input type={"checkbox"} defaultChecked={store.isTremolo} onClick={() => store.toggleTremolo()}/>
+        <input type={"checkbox"} checked={store.isTremolo} onClick={() => store.toggleTremolo()}/>
         <span />
       </ToggleWrapper>
       <EffectGroup>
@@ -204,7 +209,7 @@ export const TremoloEffect = () => {
       </EffectGroup>
     </div>
   );
-}
+});
 
 const Knob = styled.div`
   justify-self: start;
@@ -273,34 +278,32 @@ interface AudioEffectProps {
   onUpdate: (a:number) => void
 }
 
-export const AudioEffect = (props:AudioEffectProps) => {
+export const AudioEffect = observer((props:AudioEffectProps) => {
   const [value, setValue] = useState(props.initialValue);
-  const [currentY, setCurrentY] = useState(0);
+  const [prevVal, setPrevVal] = useState(0);
 
   const updateValue = (mouseY:number) => {
-    let newValue = value - (mouseY - currentY) * 0.1;
+    let newValue = value - (mouseY - prevVal);
     if (newValue > props.maxValue) { newValue = props.maxValue; }
     else if (newValue < 0) { newValue = 0; }
-
     setValue(newValue);
     props.onUpdate && props.onUpdate(newValue);
   }
 
   const handleMouseMove = (e:any) => {
     updateValue(e.clientY);
-    setCurrentY(e.clientY);
+    setPrevVal(e.clientY);
   }
 
   const handleMouseUp = (e: any) => {
     window.removeEventListener('mousemove', handleMouseMove);
     window.removeEventListener('mouseup', handleMouseUp);
-    setCurrentY(0);
   }
 
   const handleMouseDown = (e:any) => {
-    setCurrentY(e.clientY);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    console.log(prevVal);
   }
 
   const getRotation = (val:number) => {
@@ -338,7 +341,7 @@ export const AudioEffect = (props:AudioEffectProps) => {
       </div>
     </Knob>
   )
-}
+});
 
 
 export const ResizableDashBoard:React.FC = (props) => {
