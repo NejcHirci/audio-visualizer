@@ -33,10 +33,10 @@ export const PointMandelBulb = () => {
     useFrame(() => {
         // We want to simply move position by a small amount in or out from the
         // direction of the center
-        if (store.dataArray) {
+        if (store.fftArray) {
 
             for (let i = 0; i < positions.length; i += 3) {
-                let val = store.dataArray[Math.floor(i / 3) % store.dataArray.length];
+                let val = store.fftArray[Math.floor(i / 3) % store.fftArray.length];
                 pointsBufferRef.current.array[i] += randInt(-1, 1);
             }
             pointsBufferRef.current.needsUpdate = true;

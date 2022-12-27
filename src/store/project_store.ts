@@ -1,9 +1,8 @@
 import { makeAutoObservable } from 'mobx'
 import { MutableRefObject } from 'react'
-import { DataTexture2DArray } from 'three'
 import { mapLinear } from 'three/src/math/MathUtils'
 import { analyze } from 'web-audio-beat-detector';
-import * as Tone from 'tone'
+// import * as Tone from 'tone'
 
 
 export class ProjectStore {
@@ -12,14 +11,18 @@ export class ProjectStore {
   context : AudioContext;
 
   // Nodes
-  source : MediaElementAudioSourceNode;
+  sourcePlayer : MediaElementAudioSourceNode;
+  sourceMic : MediaStreamAudioSourceNode;
+  sourceEdit : AudioNode[];
+  masterGain : GainNode;
   analyser : AnalyserNode;
-  gain : GainNode;
 
   // Data
   fftSize : number = 512;
-  dataArray : Uint8Array;
-  prevArray : Uint8Array;
+  fftArray : Uint8Array;
+  prevFFTArray : Uint8Array;
+  timeArray : Uint8Array;
+  prevFloatArray : Uint8Array;
 
 
   // Analytics
@@ -29,70 +32,101 @@ export class ProjectStore {
   bpm : number = 60;
 
   // AudioEffects
-  chorus: Tone.Chorus;
-  isChorus: boolean = false;
-  tremolo: Tone.Tremolo;
-  isTremolo: boolean = false;
-  phaser: Tone.Phaser;
-  isPhaser: boolean = false;
+  // chorus: Tone.Chorus;
+  // isChorus: boolean = false;
+  // tremolo: Tone.Tremolo;
+  // isTremolo: boolean = false;
+  // phaser: Tone.Phaser;
+  // isPhaser: boolean = false;
+
+  // Microphone
+  micEnabled: boolean = false;
 
 
 
-  constructor(audioRef?:MutableRefObject<any>) {
-    if (audioRef) {
-      this.audioRef = audioRef;
-      this.source = this.context.createMediaElementSource(this.audioRef.current);
-    }
-    this.context = new AudioContext();
-    Tone.setContext(this.context);
-    this.chorus = new Tone.Chorus({frequency: 6, delayTime: 0.5, depth: 0.5});
-    this.tremolo = new Tone.Tremolo({ frequency: 12, depth: 0.9});
-    this.phaser = new Tone.Phaser({
-      frequency : 15,
-      octaves : 5,
-      baseFrequency : 500
-    });
-    this.isChorus = false;
-    this.isTremolo = false;
-    this.isPhaser = false;
+  constructor() {
+    // Tone.setContext(this.context);
+    // this.chorus = new Tone.Chorus({frequency: 6, delayTime: 0.5, depth: 0.5});
+    // this.tremolo = new Tone.Tremolo({ frequency: 12, depth: 0.9});
+    // this.phaser = new Tone.Phaser({
+    //   frequency : 15,
+    //   octaves : 5,
+    //   baseFrequency : 500
+    // });
+    // this.isChorus = false;
+    // this.isTremolo = false;
+    // this.isPhaser = false;
+
+    this.createInitialGraph();
     makeAutoObservable(this);
+  }
+
+  createInitialGraph() {
+    this.context = new AudioContext();
+
+    // We want to have 3 possible sources
+
+    // Source 1: audio player
+    this.sourcePlayer = null;
+
+    // Source 2: microphone
+    this.sourceMic = null;
+
+    // Source 3: all the oscillators
+    this.sourceEdit = []
+
+    // We create the masterGain node for all source nodes
+    this.masterGain = this.context.createGain();
+    this.masterGain.gain.value = 0.33;
+
+    // Create the analyser node
+    this.analyser = this.context.createAnalyser();
+    this.analyser.fftSize = this.fftSize;
+    this.analyser.smoothingTimeConstant = 0.9;
+
+    // Initialize array buffers
+    this.fftArray = new Uint8Array(this.analyser.fftSize);
+    this.timeArray = new Uint8Array(this.analyser.fftSize);
+    this.prevFFTArray = new Uint8Array(this.analyser.fftSize);
+    this.prevFloatArray = new Uint8Array(this.analyser.fftSize);
+
+    this.masterGain.connect(this.analyser);
+    this.analyser.connect(this.context.destination);
+  }
+
+  useMicrophone() {
+    if (!this.micEnabled) {
+      if (navigator.mediaDevices) {
+        navigator.mediaDevices.getUserMedia({ 'audio': true }).then((stream) => {
+          this.sourceMic = this.context.createMediaStreamSource(stream);
+          this.sourceMic.connect(this.masterGain);
+          this.micEnabled = true;
+        }).catch((err) => {
+          console.log(err);
+        });
+      }
+    }
   }
 
   loadAudio(audioRef: MutableRefObject<any>, url:File) {
     this.audioRef = audioRef;
-
-    if (!this.source) {
-      this.source = this.context.createMediaElementSource(this.audioRef.current);
-      this.gain = this.context.createGain();
-      this.gain.gain.value = 0.5;
-    } else {
-      this.source = this.context.createMediaElementSource(this.audioRef.current);
-    }
-
+    this.sourcePlayer = this.context.createMediaElementSource(this.audioRef.current);
     this.audioRef.current.src = URL.createObjectURL(url);
-    this.analyser = this.context.createAnalyser();
-    this.source.connect(this.gain);
-    this.gain.connect(this.analyser);
-    this.analyser.connect(this.context.destination);
-
-    this.analyser.fftSize = this.fftSize;
-    this.analyser.smoothingTimeConstant = 0.95;
-    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    this.sourcePlayer.connect(this.masterGain);
 
     // Calculate BPM after load
     let reader = new FileReader();
-
     reader.readAsArrayBuffer(url);
     reader.onloadend = () => {this.context.decodeAudioData(<ArrayBuffer>reader.result, this.tempoDetection);}
   }
 
   tempoDetection(buffer:AudioBuffer) {
-    analyze(buffer).then((tempo) => {this.bpm = tempo;});
+    analyze(buffer).then((tempo) => {this.bpm = tempo; console.log(tempo);});
   }
 
   updateArray() {
-    this.prevArray = this.dataArray;
-    this.analyser.getByteFrequencyData(this.dataArray);
+    this.prevFFTArray = this.fftArray;
+    this.analyser.getByteFrequencyData(this.fftArray);
   }
 
   updateAnalytics() {
@@ -100,20 +134,20 @@ export class ProjectStore {
     let m2 = 15;
     let m3 = 110;
 
-    this.lowFFT = mapLinear(this.avg(this.dataArray.slice(0, m1)), this.min(this.dataArray.slice(0, m1)), this.max(this.dataArray.slice(0, m1)), 0.0, 1.0);
-    this.midFFT = mapLinear(this.avg(this.dataArray.slice(m1, m2)), this.min(this.dataArray.slice(m1, m2)), this.max(this.dataArray.slice(m1, m2)), 0.0, 1.0);
-    this.highFFT = mapLinear(this.avg(this.dataArray.slice(m2, m3)), this.min(this.dataArray.slice(m2, m3)), this.max(this.dataArray.slice(m2, m3)), 0.0, 1.0);
+    this.lowFFT = mapLinear(this.avg(this.fftArray.slice(0, m1)), this.min(this.fftArray.slice(0, m1)), this.max(this.fftArray.slice(0, m1)), 0.0, 1.0);
+    this.midFFT = mapLinear(this.avg(this.fftArray.slice(m1, m2)), this.min(this.fftArray.slice(m1, m2)), this.max(this.fftArray.slice(m1, m2)), 0.0, 1.0);
+    this.highFFT = mapLinear(this.avg(this.fftArray.slice(m2, m3)), this.min(this.fftArray.slice(m2, m3)), this.max(this.fftArray.slice(m2, m3)), 0.0, 1.0);
   }
 
   getSmoothArray() {
-    let smoothing = 2;
-    let newArray = new Float32Array(this.dataArray.length);
-    for (let i = 0; i < this.dataArray.length; i++) {
+    let smoothing = 5;
+    let newArray = new Float32Array(this.fftArray.length);
+    for (let i = 0; i < this.fftArray.length; i++) {
       let sum = 0;
 
       for (let index = i - smoothing; index <= i + smoothing; index++) {
-        let thisIndex = index < 0 ? index + this.dataArray.length : index;
-        sum += (this.dataArray[thisIndex] * 0.3 + this.prevArray[thisIndex] * 0.7);
+        let thisIndex = index < 0 ? index + this.fftArray.length : index;
+        sum += (this.fftArray[thisIndex] * 0.3 + this.prevFFTArray[thisIndex] * 0.7);
       }
       newArray[i] = sum / ((smoothing*2)+1);
     }
@@ -121,76 +155,76 @@ export class ProjectStore {
   }
 
   updateChorus(f:number, delay:number, depth:number) {
-    if (this.isChorus) {
-      Tone.disconnect(this.source, this.chorus);
-      Tone.disconnect(this.chorus, this.gain);
-      this.source.connect(this.gain);
-      this.isChorus = false;
-    }
-    // Create new
-    this.chorus = new Tone.Chorus({frequency: f, delayTime: delay, depth: depth});
+    // if (this.isChorus) {
+    //   Tone.disconnect(this.source, this.chorus);
+    //   Tone.disconnect(this.chorus, this.gain);
+    //   this.source.connect(this.gain);
+    //   this.isChorus = false;
+    // }
+    // // Create new
+    // this.chorus = new Tone.Chorus({frequency: f, delayTime: delay, depth: depth});
   }
 
   updatePhaser(f:number, octaves:number, baseF:number) {
-    if (this.isPhaser) {
-      Tone.disconnect(this.source, this.phaser);
-      Tone.disconnect(this.phaser, this.gain);
-      this.source.connect(this.gain);
-      this.isPhaser = false;
-    }
-    // Create new
-    this.phaser = new Tone.Phaser({frequency: f, octaves: octaves, baseFrequency: baseF});
+    // if (this.isPhaser) {
+    //   Tone.disconnect(this.source, this.phaser);
+    //   Tone.disconnect(this.phaser, this.gain);
+    //   this.source.connect(this.gain);
+    //   this.isPhaser = false;
+    // }
+    // // Create new
+    // this.phaser = new Tone.Phaser({frequency: f, octaves: octaves, baseFrequency: baseF});
 
   }
 
   updateTremolo(f:number, depth:number) {
-    if (this.isTremolo) {
-      Tone.disconnect(this.source, this.tremolo);
-      Tone.disconnect(this.tremolo, this.gain);
-      this.source.connect(this.gain);
-      this.isTremolo = false;
-    }
-
-    // Create new
-    this.tremolo = new Tone.Tremolo({frequency:f, depth:depth, wet:0.5});
+    // if (this.isTremolo) {
+    //   Tone.disconnect(this.sou, this.tremolo);
+    //   Tone.disconnect(this.tremolo, this.gain);
+    //   this.source.connect(this.gain);
+    //   this.isTremolo = false;
+    // }
+    //
+    // // Create new
+    // this.tremolo = new Tone.Tremolo({frequency:f, depth:depth, wet:0.5});
   }
 
   togglePhaser() {
-    if (this.isPhaser) {
-      Tone.disconnect(this.source, this.phaser);
-      Tone.disconnect(this.phaser, this.gain);
-      this.source.connect(this.gain);
-    } else {
-      Tone.connect(this.source, this.phaser);
-      Tone.connect(this.phaser, this.gain);
-    }
-    this.isPhaser = !this.isPhaser;
+    // if (this.isPhaser) {
+    //   Tone.disconnect(this.source, this.phaser);
+    //   Tone.disconnect(this.phaser, this.gain);
+    //   this.source.connect(this.gain);
+    // } else {
+    //   Tone.connect(this.source, this.phaser);
+    //   Tone.connect(this.phaser, this.gain);
+    // }
+    // this.isPhaser = !this.isPhaser;
   }
 
   toggleTremolo() {
-    if (this.isTremolo) {
-      Tone.disconnect(this.source, this.tremolo);
-      Tone.disconnect(this.tremolo, this.gain);
-      this.source.connect(this.gain);
-    } else {
-      Tone.connect(this.source, this.tremolo);
-      Tone.connect(this.tremolo, this.gain);
-    }
-    this.isTremolo = !this.isTremolo;
+    // if (this.isTremolo) {
+    //   Tone.disconnect(this.source, this.tremolo);
+    //   Tone.disconnect(this.tremolo, this.gain);
+    //   this.source.connect(this.gain);
+    // } else {
+    //   Tone.connect(this.source, this.tremolo);
+    //   Tone.connect(this.tremolo, this.gain);
+    // }
+    // this.isTremolo = !this.isTremolo;
   }
 
   // Audio Effects to Add
   toggleChorus() {
-    if (this.isChorus) {
-      Tone.disconnect(this.source, this.chorus);
-      Tone.disconnect(this.chorus, this.gain);
-      this.source.connect(this.gain);
-
-    } else {
-      Tone.connect(this.source, this.chorus);
-      Tone.connect(this.chorus, this.gain);
-    }
-    this.isChorus = !this.isChorus;
+    // if (this.isChorus) {
+    //   Tone.disconnect(this.source, this.chorus);
+    //   Tone.disconnect(this.chorus, this.gain);
+    //   this.source.connect(this.gain);
+    //
+    // } else {
+    //   Tone.connect(this.source, this.chorus);
+    //   Tone.connect(this.chorus, this.gain);
+    // }
+    // this.isChorus = !this.isChorus;
   }
 
 

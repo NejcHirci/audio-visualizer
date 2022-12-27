@@ -2,12 +2,12 @@ export default `
   precision highp float;
   
   #define MaximumRaySteps 150
-  #define MaximumDistance 250.
+  #define MaximumDistance 200.
   #define MinimumDistance .0001
-  #define fftSize 128
-  #define lowLen 2
-  #define midLen 6
-  #define highLen 54
+  #define fftSize 256
+  #define lowLen 6
+  #define midLen 12
+  #define highLen 24
   
   #define PI 3.141592653589793238
   #define EPS 1e-6
@@ -21,6 +21,9 @@ export default `
   uniform float midFFT;
   uniform float highFFT;
   uniform float bpm;
+  
+  
+
   
   // TRANSFORM FUNCTIONS //
   
@@ -49,51 +52,7 @@ export default `
   float map (float value, float min1, float max1, float min2, float max2) {
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
   }
-  
-  float mandelbulb (vec3 position, float p) {
-    vec3 z = position;
-    float dr = 1.0;
-    float r = 0.0;
-    float power = p;
-  
-    for (int i = 0; i < 10; i++) {
-      r = length (z);
-  
-      if (r > 2.0) {
-        break;
-      }
-  
-      // convert to polar coordinates
-      float theta = acos (z.z / r);
-      float phi = atan (z.y, z.x);
-      dr = pow (r, power - 1.0) * power * dr + 1.0;
-  
-      // scale and rotate the point
-      float zr = pow (r, power);
-      theta = theta * power ;
-      phi = phi * power;
-      
-      theta = theta + offsetTheta;
-      
-      // convert back to cartesian coordinates
-      z = zr * vec3 (sin (theta) * cos (phi), sin (phi) * sin (theta), cos (theta));
-      z += position;
-    }
     
-    float dst = 0.5 * log (r) * r / dr;
-    return dst;
-  }
-  
-  // Audio sphere to smoothmin with Mandelbulb
-  vec3 opTwist( vec3 p ) {
-      float k = sin(iTime / (240./bpm) * 2. * PI ); // or some other amount
-      float c = cos(k*p.y);
-      float s = sin(k*p.y);
-      mat2  m = mat2(c,-s,s,c);
-      vec3  q = vec3(m*p.xz,p.y);
-      return q;
-  }
-  
   float sdSphere( vec3 p, float s ) {
     float d1 = length(p) - s;
     return d1;
@@ -106,32 +65,6 @@ export default `
     return mix( b, a, h ) - k*h*(1.0-h);
   }
   
-  float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
-  vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
-  vec4 perm(vec4 x){return mod289(((x * 34.0) + 1.0) * x);}
-  
-  float noise(vec3 p){
-    vec3 a = floor(p);
-    vec3 d = p - a;
-    d = d * d * (3.0 - 2.0 * d);
-
-    vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
-    vec4 k1 = perm(b.xyxy);
-    vec4 k2 = perm(k1.xyxy + b.zzww);
-
-    vec4 c = k2 + a.zzzz;
-    vec4 k3 = perm(c);
-    vec4 k4 = perm(c + 1.0);
-
-    vec4 o1 = fract(k3 * (1.0 / 41.0));
-    vec4 o2 = fract(k4 * (1.0 / 41.0));
-
-    vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
-    vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
-
-    return o4.y * d.y + o4.x * (1.0 - d.y);
-  }
-  
   float atan2(in float y, in float x) {
     bool s = (abs(x) > abs(y));
     return mix(PI/2.0 - atan(x,y), atan(y,x), s);
@@ -139,10 +72,11 @@ export default `
   
   // Calculate displacement
   float displacement(vec3 p) {
-    float theta = map(length(p),0.0, 3.0, 0., 1.);
+    float theta = map(atan2(p.y, p.x),0.0, 3.0, 0., 1.);
     int index = int(theta * (float(64) - 1.));
     float fftVal = fftData[index];
     float displacement = fftVal / 255.;
+    displacement = sin(5. * p.x) * cos(5. * p.y) * sin(5.  * p.z) * pow(displacement, 4.);
     return sin(map(displacement, 0.,1., -PI/2., PI/2.));
   }
   
@@ -150,17 +84,15 @@ export default `
   float reactiveDistance(float fractal, vec3 p) {
     float outFloat = fractal;
     float r = length(p);
-    outFloat = outFloat - displacement(p) * 0.03;
+    outFloat = outFloat - displacement(p) * 0.5;
         
     return outFloat;
   }
   
-  
   // Calculates de distance from a position p to the scene
   float getSceneDistance (vec3 p) {
-    vec3 q = opTwist(p);
-    float mandelbulb = reactiveDistance(mandelbulb(q, 8.0), q);
-    return mandelbulb;
+    float base = sdSphere(p, 1.0);
+    return reactiveDistance(base, p);
   }
   
   // Marches the ray in the scene
@@ -223,7 +155,7 @@ export default `
     vec3 lookAt = vec3(0);
     vec3 rd = RayDirection(uv, ro, lookAt, 2.); // Ray direction (based on mouse rotation)
 
-    vec4 col = RayMarcher (ro, rd);
+    vec4 col = RayMarcher(ro, rd);
   
     // Output to screen
     gl_FragColor = vec4 (col.rgb, 1.0);

@@ -4,13 +4,17 @@ import * as THREE from "three";
 import { useFrame, useThree } from '@react-three/fiber'
 
 import mandelbulb from '../shaders/mandelbulb'
+import deformedSphere from '../shaders/deformedSphere'
 import defaultFragShader from '../shaders/defaultFragShader'
 import defaultVertexShader from '../shaders/defaultVertexShader'
+
 import { ProjectStoreContext } from '../App'
 import { mapLinear, smoothstep } from 'three/src/math/MathUtils'
 import { Clock } from 'three'
 
 export const RayMarched_MandelBulb = () => {
+  let prevTime = 0, curTime;
+
   const meshRef=useRef(null);
   const {camera} = useThree();
   const store = useContext(ProjectStoreContext);
@@ -41,23 +45,27 @@ export const RayMarched_MandelBulb = () => {
 
   useFrame((state, delta) => {
     let activeUniforms = meshRef.current.material.uniforms;
-    activeUniforms.iRayOrigin.value = camera.position;
+    curTime = state.clock.getElapsedTime();
+    activeUniforms.iTime = state.clock.getElapsedTime();
 
-    if (store.analyser && !store.audioRef.current.paused) {
-      activeUniforms.iTime.value += delta;
+
+    if (curTime - prevTime > 0.02) {
+      activeUniforms.iRayOrigin.value = camera.position;
       activeUniforms.offsetTheta.value =
         (activeUniforms.offsetTheta.value * store.bpm / 60.0 + delta) % (2 * Math.PI);
       activeUniforms.bpm.value = store.bpm;
+      if (store.audioRef || store.micEnabled) {
+        store.updateArray();
+        store.updateAnalytics();
 
-      store.updateArray();
-      store.updateAnalytics();
-
-      if (store.lowFFT+store.midFFT+store.highFFT > 0.0) {
-        activeUniforms.lowFFT.value = 0.5*activeUniforms.lowFFT.value+store.lowFFT*0.5;
-        activeUniforms.midFFT.value = 0.5*activeUniforms.midFFT.value+store.midFFT*0.5;
-        activeUniforms.highFFT.value = 0.5*activeUniforms.highFFT.value+store.highFFT*0.5;
-        activeUniforms.fftData.value = store.getSmoothArray();
+        if (store.lowFFT + store.midFFT + store.highFFT > 0.0) {
+          activeUniforms.lowFFT.value = 0.5 * activeUniforms.lowFFT.value + store.lowFFT * 0.5;
+          activeUniforms.midFFT.value = 0.5 * activeUniforms.midFFT.value + store.midFFT * 0.5;
+          activeUniforms.highFFT.value = 0.5 * activeUniforms.highFFT.value + store.highFFT * 0.5;
+          activeUniforms.fftData.value = store.getSmoothArray();
+        }
       }
+      prevTime = state.clock.getElapsedTime();
     }
   });
 
@@ -66,7 +74,7 @@ export const RayMarched_MandelBulb = () => {
       <planeBufferGeometry args={[2, 2, 1, 1]}/>
       <shaderMaterial
         attach={'material'}
-        fragmentShader={mandelbulb}
+        fragmentShader={deformedSphere}
         vertexShader={defaultVertexShader}
         uniforms={uniforms}
         wireframe={false}

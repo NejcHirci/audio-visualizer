@@ -2,8 +2,6 @@ import * as React from 'react'
 import styled from 'styled-components'
 import { MutableRefObject, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { ProjectStoreContext } from '../App'
-import { set } from 'mobx'
-import { ToggleButton } from './components/toggle'
 import { mapLinear, randInt } from 'three/src/math/MathUtils'
 import { observer } from "mobx-react-lite"
 
@@ -45,7 +43,7 @@ const DashboardContent = styled.div`
 `
 
 
-const AudioSelect = styled.div`
+const SelectButton = styled.div`
   pointer-events: auto;
   margin-left: auto;
   margin-right: auto;
@@ -102,7 +100,7 @@ export const UserInterface = observer(() => {
   return (
     <InterfaceWrapper>
       <ResizableDashBoard>
-        <AudioSelect>
+        <SelectButton>
           <label form={'audioFile'}> Choose an audio file
             <input onChange={(e) => {
               store.loadAudio(audioRef, e.target.files[0])
@@ -111,9 +109,20 @@ export const UserInterface = observer(() => {
                    id={'audioFile'}
                    accept={'audio/*'} />
           </label>
-        </AudioSelect>
+        </SelectButton>
+        <SelectButton>
+          <label form={'enableMic'}> Use Microphone
+            <input onClick={(e) => {
+              store.useMicrophone();
+            }}
+                   type={'button'}
+                   id={'enableMic'}
+                   style={{'display': 'none'}}
+            />
+          </label>
+        </SelectButton>
         <Divider/>
-        { store.source !== undefined  &&
+        { store.audioRef !== undefined  &&
           <>
             <ChorusEffect/>
             <PhaserEffect/>
@@ -148,20 +157,20 @@ export const ChorusEffect = observer(() => {
     <div style={{display: 'flex', gap: '10px', flexDirection: 'column'}}>
       <EffectTitle>Chorus Effect</EffectTitle>
       <ToggleWrapper>
-        <input type={"checkbox"} checked={store.isChorus} onClick={() => store.toggleChorus()}/>
-        <span />
+        {/*<input type={"checkbox"} checked={store.isChorus} onChange={() => store.toggleChorus()}/>*/}
+        {/*<span />*/}
       </ToggleWrapper>
-      <EffectGroup>
-        <AudioEffect label={'Frequency'} maxValue={6} initialValue={0.1} onUpdate={(a) => {
-          store.source && store.updateChorus(a, store.chorus.delayTime, store.chorus.depth);
-        }}/>
-        <AudioEffect label={'Delay Time'} maxValue={35} initialValue={store.chorus.delayTime} onUpdate={(a) => {
-          store.source && store.updateChorus(4, a, store.chorus.depth);
-        }}/>
-        <AudioEffect label={'Depth'} maxValue={1.0} initialValue={store.chorus.depth} onUpdate={(a) => {
-          store.source && store.updateChorus(0.1, store.chorus.delayTime, a);
-        }}/>
-      </EffectGroup>
+      {/*<EffectGroup>*/}
+      {/*  <AudioEffect label={'Frequency'} maxValue={6} initialValue={0.1} onUpdate={(a) => {*/}
+      {/*    store.audioRef && store.updateChorus(a, store.chorus.delayTime, store.chorus.depth);*/}
+      {/*  }}/>*/}
+      {/*  <AudioEffect label={'Delay Time'} maxValue={35} initialValue={store.chorus.delayTime} onUpdate={(a) => {*/}
+      {/*    store.audioRef && store.updateChorus(4, a, store.chorus.depth);*/}
+      {/*  }}/>*/}
+      {/*  <AudioEffect label={'Depth'} maxValue={1.0} initialValue={store.chorus.depth} onUpdate={(a) => {*/}
+      {/*    store.audioRef && store.updateChorus(0.1, store.chorus.delayTime, a);*/}
+      {/*  }}/>*/}
+      {/*</EffectGroup>*/}
     </div>
   );
 });
@@ -172,20 +181,20 @@ export const PhaserEffect = observer(() => {
     <div style={{display: 'flex', gap: '10px', flexDirection: 'column'}}>
       <EffectTitle>Phaser Effect</EffectTitle>
       <ToggleWrapper>
-        <input type={"checkbox"} checked={store.isPhaser} onClick={() => store.togglePhaser()}/>
-        <span />
+        {/*<input type={"checkbox"} checked={store.isPhaser} onChange={() => store.togglePhaser()}/>*/}
+        {/*<span />*/}
       </ToggleWrapper>
-      <EffectGroup>
-        <AudioEffect label={'Frequency'} maxValue={30} initialValue={15} onUpdate={(a) => {
-          store.source && store.updatePhaser(a, store.phaser.octaves, 350);
-        }}/>
-        <AudioEffect label={'Octaves'} maxValue={3} initialValue={store.phaser.octaves} onUpdate={(a) => {
-          store.source && store.updatePhaser(0.5, a, 350);
-        }}/>
-        <AudioEffect label={'Base Frequency'} maxValue={350} initialValue={350} onUpdate={(a) => {
-          store.source && store.updatePhaser(0.5, store.phaser.octaves, a);
-        }}/>
-      </EffectGroup>
+      {/*<EffectGroup>*/}
+      {/*  <AudioEffect label={'Frequency'} maxValue={30} initialValue={15} onUpdate={(a) => {*/}
+      {/*    store.audioRef && store.updatePhaser(a, store.phaser.octaves, 350);*/}
+      {/*  }}/>*/}
+      {/*  <AudioEffect label={'Octaves'} maxValue={3} initialValue={store.phaser.octaves} onUpdate={(a) => {*/}
+      {/*    store.audioRef && store.updatePhaser(0.5, a, 350);*/}
+      {/*  }}/>*/}
+      {/*  <AudioEffect label={'Base Frequency'} maxValue={350} initialValue={350} onUpdate={(a) => {*/}
+      {/*    store.audioRef && store.updatePhaser(0.5, store.phaser.octaves, a);*/}
+      {/*  }}/>*/}
+      {/*</EffectGroup>*/}
     </div>
   );
 });
@@ -196,17 +205,17 @@ export const TremoloEffect = observer(() => {
     <div style={{display: 'flex', gap: '10px', flexDirection: 'column'}}>
       <EffectTitle>Tremolo Effect</EffectTitle>
       <ToggleWrapper>
-        <input type={"checkbox"} checked={store.isTremolo} onClick={() => store.toggleTremolo()}/>
-        <span />
+        {/*<input type={"checkbox"} checked={store.isTremolo} onChange={() => store.toggleTremolo()}/>*/}
+        {/*<span />*/}
       </ToggleWrapper>
-      <EffectGroup>
-        <AudioEffect label={'Frequency'} maxValue={10} initialValue={10} onUpdate={(a) => {
-          store.source && store.updateTremolo(a, store.tremolo.depth.value) ;
-        }}/>
-        <AudioEffect label={'Depth'} maxValue={3} initialValue={store.chorus.delayTime} onUpdate={(a) => {
-          store.source && store.updateTremolo(10, a);
-        }}/>
-      </EffectGroup>
+      {/*<EffectGroup>*/}
+      {/*  <AudioEffect label={'Frequency'} maxValue={10} initialValue={10} onUpdate={(a) => {*/}
+      {/*    store.updateTremolo(a, store.tremolo.depth.value) ;*/}
+      {/*  }}/>*/}
+      {/*  <AudioEffect label={'Depth'} maxValue={3} initialValue={store.chorus.delayTime} onUpdate={(a) => {*/}
+      {/*    store.updateTremolo(10, a);*/}
+      {/*  }}/>*/}
+      {/*</EffectGroup>*/}
     </div>
   );
 });
