@@ -103,13 +103,13 @@ export default `
   
   // Calculate displacement
   float displacement(vec3 p) {
-    float theta = map(length(p), 0.0, 12.0, 0.0, 1.0);
+    float theta = map(max(length(p), 0.3), 0.3, 10.0, 0.0, 1.0);
     
     // Option 3: Amplitude spectrum
     int index = int(theta * float(buffSize));
     float ampVal = amplitudeSpectrum[index];
     float synthVal = synthAmpSpectrum[index];
-    float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * sin(1.0 - theta);
+    float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * pow((1. - theta), 4.);
     
     return displacement;
   }

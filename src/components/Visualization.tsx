@@ -10,6 +10,7 @@ import menger_brocolli from '../shaders/menger_brocolli'
 
 import { ProjectStoreContext } from '../App'
 import menger_mushroom from '../shaders/menger_mushroom'
+import savitzkyGolay from 'ml-savitzky-golay'
 
 
 export const Visualization = observer(() => {
@@ -74,7 +75,9 @@ export const Visualization = observer(() => {
       store.prevperceptualSpread = val;
     }
     if (store.synthAmpSpectrum) {
-      activeUniforms.synthAmpSpectrum.value = store.synthAmpSpectrum;
+      let cur = Array.from(store.synthAmpSpectrum);
+      activeUniforms.synthAmpSpectrum.value = new Float32Array(savitzkyGolay(cur, 1,
+        {derivative: 0, pad: 'post', padValue: 'replicate'}));
     }
 
   })
