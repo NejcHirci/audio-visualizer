@@ -9,12 +9,15 @@
   "main": "src/index.js",
   "dependencies": {
     "@react-three/fiber": "^7.0.4",
+    "@types/meyda": "^4.3.2",
     "@types/react": "17.0.14",
     "@types/react-dom": "17.0.9",
     "@types/stats": "^0.16.30",
     "@types/styled-components": "^5.1.26",
     "@types/three": "0.130.0",
     "glslify-loader": "^2.0.0",
+    "meyda": "^5.5.1",
+    "ml-savitzky-golay": "^5.0.0",
     "mobx": "^6.7.0",
     "mobx-react-lite": "^3.4.0",
     "pizzicato": "^0.6.4",
@@ -25,6 +28,7 @@
     "styled-components": "^5.3.6",
     "svg-knob": "^1.15.0",
     "three": "^0.130.1",
+    "tone": "^14.7.77",
     "web-audio-beat-detector": "^8.1.40"
   },
   "scripts": {

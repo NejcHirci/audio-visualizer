@@ -57,38 +57,50 @@ export default `
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
   }
   
-  float mandelbulb (vec3 position, float p) {
-    vec3 z = position;
-    float dr = 1.0;
-    float r = 0.0;
-    float power = p;
+  float sierpinski3 (vec3 z) {
+    float iterations = 25.0;
+    float Scale = 2.6 + (sin (iTime / 5.0) * 0.5);
+    vec3 Offset = 0.8 * vec3 (1.0, 1.0, 1.0);
+    float bailout = 1000.0;
   
-    for (int i = 0; i < 10; i++) {
-      r = length (z);
+    float r = length (z);
+    int n = 0;
+    while (n < int (iterations) && r < bailout) {
+      //z.yz *= Rotate (map (sin (iTime / 2.0), -1.0, 1.0, 0.0, 2.0) * PI);
+      z.yx *= Rotate (sin (iTime / 5.0));
+      //z.yx *= Rotate (0.436332);
+      //z.yx *= Rotate (PI / 10.0);
+      //z.xz *= Rotate(map(sin(iTime / 2.0), -1.0, 1.0, 0.0, 2.0) * PI);
   
-      if (r > 2.0) {
-        break;
+      z.x = abs (z.x);
+      z.y = abs (z.y);
+      z.z = abs (z.z);
+  
+      if (z.x - z.y < 0.0) z.xy = z.yx; // fold 1
+      if (z.x - z.z < 0.0) z.xz = z.zx; // fold 2
+      if (z.y - z.z < 0.0) z.zy = z.yz; // fold 3
+  
+      z.yz *= Rotate (sin (iTime / 2.0) / 2.0);
+      //z.yx *= Rotate (sin (iTime / 2.0) / 5.0);
+      //z.yx *= Rotate(-map(mouse.x, -1.0, 1.0, 0.0, 2.0));
+      //z.xz *= Rotate (0.4336332 + 0.02 * iTime);
+      //z.yx *= Rotate (PI / 10.0);
+      z.xz *= Rotate (sin (iTime / 2.0) / 5.0);
+  
+      z.x = z.x * Scale - Offset.x * (Scale - 1.0);
+      z.y = z.y * Scale - Offset.y * (Scale - 1.0);
+      z.z = z.z * Scale;
+  
+      if (z.z > 0.5 * Offset.z * (Scale - 1.0)) {
+        z.z -= Offset.z * (Scale - 1.0);
       }
   
-      // convert to polar coordinates
-      float theta = acos (z.z / r);
-      float phi = atan (z.y, z.x);
-      dr = pow (r, power - 1.0) * power * dr + 1.0;
+      r = length (z);
   
-      // scale and rotate the point
-      float zr = pow (r, power);
-      theta = theta * power ;
-      phi = phi * power;
-      
-      theta = theta + offsetTheta;
-      
-      // convert back to cartesian coordinates
-      z = zr * vec3 (sin (theta) * cos (phi), sin (phi) * sin (theta), cos (theta));
-      z += position;
+      n++;
     }
-    
-    float dst = 0.5 * log (r) * r / dr;
-    return dst;
+  
+    return (length (z) - 2.0) * pow (Scale, -float (n));
   }
   
   float sdSphere( vec3 p, float s ) {
@@ -103,13 +115,13 @@ export default `
   
   // Calculate displacement
   float displacement(vec3 p) {
-    float theta = map(length(p), 0.0, 12.0, 0.0, 1.0);
+    float theta = map(max(length(p), 0.3), 0.3, 6.0, 0.0, 1.0);
     
     // Option 3: Amplitude spectrum
-    int index = int(theta * float(buffSize));
+    int index = int(theta * float(64.));
     float ampVal = amplitudeSpectrum[index];
     float synthVal = synthAmpSpectrum[index];
-    float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * sin(1.0 - theta);
+    float displacement = ((ampVal + synthVal) / 2.0) * 0.05 * sin(1.0 - theta);
     
     return displacement;
   }
@@ -145,9 +157,9 @@ export default `
     int index = 0;
 
     for (float j=-0.8; j <= 0.8; j+=0.4) {
-      vec2 xy =  vec2(sqrt(1.0 - j*j), 0.) * Rotate(offsetTheta);
+      vec2 xy = vec2(sqrt(1.1 - j*j), 0.0) * Rotate(offsetTheta);
       bPos = pos + vec3(xy.x, xy.y, j);
-      outVal = smin(outVal, sdSphere(bPos, ballRadius + map(chroma[index], minChroma, 1., 0., 1.) / 10.0), k);
+      outVal = smin(outVal, sdSphere(bPos, ballRadius + map(chroma[index], minChroma, 1., 0., 1.) / 5.0), k);
       index++;
     }
     
@@ -157,9 +169,9 @@ export default `
   
   // Calculates de distance from a position p to the scene
   float getSceneDistance (vec3 p) {
-    float fractal = reactiveDistance(mandelbulb(p, 6.0), p);
+    float fractal = reactiveDistance(sierpinski3(p), p);
     float balls = metaBalls(p);
-    return smin(fractal, balls, 0.1);
+    return smin(fractal, balls, 0.4);
   }
   
   // Marches the ray in the scene
@@ -195,17 +207,15 @@ export default `
       }
     }
     
-    
-    
     if (hit) {
-      col.rgb = vec3 (6.0 + (length (curPos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.8);
+      col.rgb = vec3 (6.0 + (length (curPos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.2);
       col.rgb = hsv2rgb (col.rgb);
     }
     else {
-      col.rgb = vec3 (6.0 + (length (minDistToScenePos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.8);
+      col.rgb = vec3 (6.0 + (length (minDistToScenePos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.2);
       col.rgb = hsv2rgb (col.rgb);
       col.rgb *= 1.0 / (minDistToScene * minDistToScene);
-      col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 100.0, 5000.0);
+      col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 1000.0, 5000.0);
     }
   
     col.rgb /= steps * 0.08; // Ambeint occlusion

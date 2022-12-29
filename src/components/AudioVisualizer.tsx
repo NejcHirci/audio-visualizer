@@ -7,7 +7,7 @@ import { ProjectStoreContext } from '../App'
 // Create appropriate JSX component from js
 import { addTail, Canvas, extend, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import { RayMarched_MandelBulb } from './RayMarched_MandelBulb'
+import { Visualization } from './Visualization'
 import styled from 'styled-components'
 
 
@@ -42,10 +42,10 @@ const CameraControls = () => {
 
 const AnimationCanvas = () => {
   return (
-    <Canvas camera={{position: [0, 3, 0]}}>
+    <Canvas camera={{position: [0, 0, 3]}}>
       <CameraControls/>
       <Suspense fallback={null}>
-        <RayMarched_MandelBulb/>
+        <Visualization/>
       </Suspense>
       <Stats/>
     </Canvas>

@@ -1,8 +1,11 @@
 import { makeAutoObservable } from 'mobx'
 import { MutableRefObject } from 'react'
-import { mapLinear } from 'three/src/math/MathUtils'
-import { analyze } from 'web-audio-beat-detector';
-// import * as Tone from 'tone'
+import { analyze } from 'web-audio-beat-detector'
+import Meyda from 'meyda'
+import savitzkyGolay from 'ml-savitzky-golay'
+
+import * as Tone from 'tone'
+import { Gain } from 'tone'
 
 
 export class ProjectStore {
@@ -13,34 +16,44 @@ export class ProjectStore {
   // Nodes
   sourcePlayer : MediaElementAudioSourceNode;
   sourceMic : MediaStreamAudioSourceNode;
-  sourceEdit : AudioNode[];
   masterGain : GainNode;
-  analyser : AnalyserNode;
-
-  // Data
-  fftSize : number = 512;
-  fftArray : Uint8Array;
-  prevFFTArray : Uint8Array;
-  timeArray : Uint8Array;
-  prevFloatArray : Uint8Array;
+  micAndSynthGain : GainNode;
 
 
-  // Analytics
-  lowFFT : number = 1;
-  midFFT : number = 1;
-  highFFT : number = 1;
+  // Analysers
+  analyserPlayer : Meyda.MeydaAnalyzer;
+
+
+  analyserMicAndSynth : Meyda.MeydaAnalyzer;
+  synthAmpSpectrum : Float32Array;
+
+  // Data Player
+  bufferSize : number = 256;
+  rms: number = 0;
+  prevRms: number = 0;
+  spectralCentroid: number | null;
+  perceptualSpread: number;
+  prevperceptualSpread : number = 0;
+  chroma: Float32Array;
+  prevChroma: Float32Array;
+  amplitudeSpectrum: Float32Array;
+  prevAmpSpectrum: Float32Array;
   bpm : number = 60;
-
-  // AudioEffects
-  // chorus: Tone.Chorus;
-  // isChorus: boolean = false;
-  // tremolo: Tone.Tremolo;
-  // isTremolo: boolean = false;
-  // phaser: Tone.Phaser;
-  // isPhaser: boolean = false;
 
   // Microphone
   micEnabled: boolean = false;
+
+  // VisualizationSettings
+  visualizations = [
+    {id: 1, label: 'Mandel Bulb'},
+    {id: 2, label: 'Menger Brocolli'},
+    {id: 3, label: 'Menger Mushroom'}
+  ]
+  selectedVisualization: number
+
+
+  // For adding sounds
+  synth : Tone.Synth;
 
 
 
@@ -57,6 +70,7 @@ export class ProjectStore {
     // this.isTremolo = false;
     // this.isPhaser = false;
 
+    this.selectedVisualization = 1;
     this.createInitialGraph();
     makeAutoObservable(this);
   }
@@ -64,176 +78,142 @@ export class ProjectStore {
   createInitialGraph() {
     this.context = new AudioContext();
 
-    // We want to have 3 possible sources
+    // We create the masterGain node for all source nodes
+    this.masterGain = this.context.createGain();
+    this.masterGain.gain.value = 0.7;
+    this.masterGain.connect(this.context.destination);
 
+    // We want to have 3 possible sources
     // Source 1: audio player
     this.sourcePlayer = null;
+
+    this.micAndSynthGain = this.context.createGain();
+    this.micAndSynthGain.gain.value = 0.5;
 
     // Source 2: microphone
     this.sourceMic = null;
 
-    // Source 3: all the oscillators
-    this.sourceEdit = []
+    // Source 3:
+    Tone.setContext(this.context);
+    this.synth = new Tone.Synth();
+    Tone.connect(this.synth, this.masterGain);
+    Tone.connect(this.synth, this.micAndSynthGain);
 
-    // We create the masterGain node for all source nodes
-    this.masterGain = this.context.createGain();
-    this.masterGain.gain.value = 0.33;
+
+    this.prevChroma = new Float32Array(12);
+    this.prevAmpSpectrum = new Float32Array(this.bufferSize / 2);
 
     // Create the analyser node
-    this.analyser = this.context.createAnalyser();
-    this.analyser.fftSize = this.fftSize;
-    this.analyser.smoothingTimeConstant = 0.9;
-
-    // Initialize array buffers
-    this.fftArray = new Uint8Array(this.analyser.fftSize);
-    this.timeArray = new Uint8Array(this.analyser.fftSize);
-    this.prevFFTArray = new Uint8Array(this.analyser.fftSize);
-    this.prevFloatArray = new Uint8Array(this.analyser.fftSize);
-
-    this.masterGain.connect(this.analyser);
-    this.analyser.connect(this.context.destination);
+    this.analyserMicAndSynth = Meyda.createMeydaAnalyzer({
+      audioContext: this.context,
+      source: this.micAndSynthGain,
+      bufferSize: this.bufferSize,
+      featureExtractors: [
+        "amplitudeSpectrum"
+      ],
+      callback: (features:any) => {
+        this.synthAmpSpectrum = features.amplitudeSpectrum;
+      }
+    });
+    this.analyserMicAndSynth.start();
   }
 
-  useMicrophone() {
+  triggerNote(note:string, duration:string="4n") {
+    this.synth.triggerAttackRelease(note, duration);
+  }
+
+  toggleMic() {
     if (!this.micEnabled) {
       if (navigator.mediaDevices) {
         navigator.mediaDevices.getUserMedia({ 'audio': true }).then((stream) => {
-          this.sourceMic = this.context.createMediaStreamSource(stream);
-          this.sourceMic.connect(this.masterGain);
+          if (!this.sourceMic) {
+            this.sourceMic = this.context.createMediaStreamSource(stream);
+          }
+          this.sourceMic.connect(this.micAndSynthGain);
           this.micEnabled = true;
         }).catch((err) => {
           console.log(err);
         });
       }
+    } else {
+      this.sourceMic.disconnect();
+      this.micEnabled = false;
     }
   }
 
   loadAudio(audioRef: MutableRefObject<any>, url:File) {
     this.audioRef = audioRef;
-    this.sourcePlayer = this.context.createMediaElementSource(this.audioRef.current);
+
+    if (!this.sourcePlayer) {
+      this.sourcePlayer = this.context.createMediaElementSource(this.audioRef.current);
+    }
+
+    if (!this.analyserPlayer) {
+      // Create the analyser node
+      this.analyserPlayer = Meyda.createMeydaAnalyzer({
+        audioContext: this.context,
+        source: this.sourcePlayer,
+        bufferSize: this.bufferSize,
+        featureExtractors: [
+          "rms",
+          "amplitudeSpectrum",
+          "spectralCentroid",
+          "perceptualSpread",
+          "chroma",
+        ],
+        callback: (features:any) => {
+          this.amplitudeSpectrum = features.amplitudeSpectrum;
+          this.rms = features.rms;
+          this.perceptualSpread = features.perceptualSpread;
+          this.spectralCentroid = features.spectralCentroid;
+          this.chroma = features.chroma;
+        }
+      });
+    }
+
     this.audioRef.current.src = URL.createObjectURL(url);
     this.sourcePlayer.connect(this.masterGain);
 
     // Calculate BPM after load
     let reader = new FileReader();
     reader.readAsArrayBuffer(url);
-    reader.onloadend = () => {this.context.decodeAudioData(<ArrayBuffer>reader.result, this.tempoDetection);}
-  }
-
-  tempoDetection(buffer:AudioBuffer) {
-    analyze(buffer).then((tempo) => {this.bpm = tempo; console.log(tempo);});
-  }
-
-  updateArray() {
-    this.prevFFTArray = this.fftArray;
-    this.analyser.getByteFrequencyData(this.fftArray);
-  }
-
-  updateAnalytics() {
-    let m1 = 6;
-    let m2 = 15;
-    let m3 = 110;
-
-    this.lowFFT = mapLinear(this.avg(this.fftArray.slice(0, m1)), this.min(this.fftArray.slice(0, m1)), this.max(this.fftArray.slice(0, m1)), 0.0, 1.0);
-    this.midFFT = mapLinear(this.avg(this.fftArray.slice(m1, m2)), this.min(this.fftArray.slice(m1, m2)), this.max(this.fftArray.slice(m1, m2)), 0.0, 1.0);
-    this.highFFT = mapLinear(this.avg(this.fftArray.slice(m2, m3)), this.min(this.fftArray.slice(m2, m3)), this.max(this.fftArray.slice(m2, m3)), 0.0, 1.0);
-  }
-
-  getSmoothArray() {
-    let smoothing = 5;
-    let newArray = new Float32Array(this.fftArray.length);
-    for (let i = 0; i < this.fftArray.length; i++) {
-      let sum = 0;
-
-      for (let index = i - smoothing; index <= i + smoothing; index++) {
-        let thisIndex = index < 0 ? index + this.fftArray.length : index;
-        sum += (this.fftArray[thisIndex] * 0.3 + this.prevFFTArray[thisIndex] * 0.7);
-      }
-      newArray[i] = sum / ((smoothing*2)+1);
+    reader.onloadend = async () => {
+     this.bpm = await this.context.decodeAudioData(<ArrayBuffer>reader.result).then(async (buffer) => await analyze(buffer));
     }
-    return newArray;
+    this.analyserPlayer.start();
   }
 
-  updateChorus(f:number, delay:number, depth:number) {
-    // if (this.isChorus) {
-    //   Tone.disconnect(this.source, this.chorus);
-    //   Tone.disconnect(this.chorus, this.gain);
-    //   this.source.connect(this.gain);
-    //   this.isChorus = false;
-    // }
-    // // Create new
-    // this.chorus = new Tone.Chorus({frequency: f, delayTime: delay, depth: depth});
+  getSmoothArray(arr: Float32Array, prevArr: Float32Array, k:number, useSavitzky:boolean = true) {
+    if (arr && prevArr) {
+      let curArrBase = Array.from(arr);
+      let prevArrBase = Array.from(prevArr);
+
+      if (useSavitzky) {
+        curArrBase = savitzkyGolay(curArrBase, 1, {
+          pad: 'post',
+          padValue: 'replicate',
+          derivative: 0
+        });
+        prevArrBase = savitzkyGolay(prevArrBase, 1, {
+          pad: 'post',
+          padValue: 'replicate',
+          derivative: 0
+        });
+      }
+
+      let newArray = [];
+      for (let i = 0; i < arr.length; i++) {
+        newArray.push(curArrBase[i] * k + prevArrBase[i] * (1 - k));
+      }
+      return new Float32Array(newArray);
+    }
+    return new Float32Array(arr);
   }
 
-  updatePhaser(f:number, octaves:number, baseF:number) {
-    // if (this.isPhaser) {
-    //   Tone.disconnect(this.source, this.phaser);
-    //   Tone.disconnect(this.phaser, this.gain);
-    //   this.source.connect(this.gain);
-    //   this.isPhaser = false;
-    // }
-    // // Create new
-    // this.phaser = new Tone.Phaser({frequency: f, octaves: octaves, baseFrequency: baseF});
-
+  setVisualization(id:number) {
+    this.selectedVisualization = id;
   }
 
-  updateTremolo(f:number, depth:number) {
-    // if (this.isTremolo) {
-    //   Tone.disconnect(this.sou, this.tremolo);
-    //   Tone.disconnect(this.tremolo, this.gain);
-    //   this.source.connect(this.gain);
-    //   this.isTremolo = false;
-    // }
-    //
-    // // Create new
-    // this.tremolo = new Tone.Tremolo({frequency:f, depth:depth, wet:0.5});
-  }
-
-  togglePhaser() {
-    // if (this.isPhaser) {
-    //   Tone.disconnect(this.source, this.phaser);
-    //   Tone.disconnect(this.phaser, this.gain);
-    //   this.source.connect(this.gain);
-    // } else {
-    //   Tone.connect(this.source, this.phaser);
-    //   Tone.connect(this.phaser, this.gain);
-    // }
-    // this.isPhaser = !this.isPhaser;
-  }
-
-  toggleTremolo() {
-    // if (this.isTremolo) {
-    //   Tone.disconnect(this.source, this.tremolo);
-    //   Tone.disconnect(this.tremolo, this.gain);
-    //   this.source.connect(this.gain);
-    // } else {
-    //   Tone.connect(this.source, this.tremolo);
-    //   Tone.connect(this.tremolo, this.gain);
-    // }
-    // this.isTremolo = !this.isTremolo;
-  }
-
-  // Audio Effects to Add
-  toggleChorus() {
-    // if (this.isChorus) {
-    //   Tone.disconnect(this.source, this.chorus);
-    //   Tone.disconnect(this.chorus, this.gain);
-    //   this.source.connect(this.gain);
-    //
-    // } else {
-    //   Tone.connect(this.source, this.chorus);
-    //   Tone.connect(this.chorus, this.gain);
-    // }
-    // this.isChorus = !this.isChorus;
-  }
-
-
-
-  // UTILITIES
-
-  avg(arr:Uint8Array) {
-    return arr.reduce((p, c) => p+c, 0) / arr.length;
-  }
 
   max(arr:Uint8Array) {
     return arr.reduce((a, b) => a > b ? a : b);
