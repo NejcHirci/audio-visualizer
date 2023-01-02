@@ -2,6 +2,7 @@
   "name": "react-three-fiber-typescript-template",
   "version": "1.0.0",
   "description": "",
+  "homepage": "https://nejchirci.github.io/audio-visualizer",
   "keywords": [
     "r3f",
     "reactjs"
@@ -15,6 +16,7 @@
     "@types/stats": "^0.16.30",
     "@types/styled-components": "^5.1.26",
     "@types/three": "0.130.0",
+    "gh-pages": "^4.0.0",
     "glslify-loader": "^2.0.0",
     "meyda": "^5.5.1",
     "ml-savitzky-golay": "^5.0.0",
@@ -35,7 +37,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "browserslist": [
     ">0.2%",

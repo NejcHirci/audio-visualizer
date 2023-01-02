@@ -2,9 +2,9 @@ export default `
   precision mediump float;
   
   // Ray Marching Settings
-  #define MaximumRaySteps 100
-  #define MaximumDistance 250.
-  #define MinimumDistance .001
+  #define MAX_RAY_STEPS 50
+  #define MAX_DIST 150.
+  #define MIN_DIST .001
 
   // Constants 
   #define PI 3.141592653589793238
@@ -31,13 +31,13 @@ export default `
   
   // TRANSFORM FUNCTIONS //
   
-  mat2 Rotate (float angle) {
+  mat2 rotate2d (float angle) {
     float s = sin (angle);
     float c = cos (angle);
     return mat2 (c, -s, s, c);
   }
   
-  vec3 RayDirection (vec2 uv, vec3 ro, vec3 lookat, float zoom) {
+  vec3 calcRayDirection (vec2 uv, vec3 ro, vec3 lookat, float zoom) {
     vec3 f = normalize (lookat - ro),
       r = normalize (cross (vec3 (0, 1, 0), f)),
       u = cross (f, r),
@@ -58,14 +58,13 @@ export default `
   }
   
   float mengerbrocolli (vec3 z, float p) {
-    float iterations = 25.0;
+    float iterations = 20.0;
     float Scale = 2.421312 + (sin (iTime / 5.0) * 0.3);
     vec3 Offset = vec3 (0.7687, 1.32837, 0.0);
-    float bailout = 1000.0;
   
     float r = length (z);
     int n = 0;
-    while (n < int (iterations) && r < bailout) {
+    while (n < int (iterations)) {
       z.x = abs (z.x);
       z.y = abs (z.y);
       z.z = abs (z.z);
@@ -74,9 +73,9 @@ export default `
       if (z.x - z.z < 0.0) z.xz = z.zx; // fold 2
       if (z.y - z.z < 0.0) z.zy = z.yz; // fold 3
   
-      z.yx *= Rotate (0.436332 + map(sin(offsetTheta), -1., 1., 1., PI) * 0.9 * 0.1 + 4.9);
+      z.yx *= rotate2d(0.436332 + map(sin(offsetTheta), -1., 1., 1., PI) * 0.9 * 0.1 + 4.9);
       
-      z.zy *= Rotate(0.3323 * rms);
+      z.zy *= rotate2d(0.3323 * rms);
   
       z.x = z.x * Scale - Offset.x * (Scale - 1.0);
       z.y = z.y * Scale - Offset.y * (Scale - 1.0);
@@ -94,35 +93,14 @@ export default `
     return (length (z) - 2.0) * pow (Scale, -float (n));
   }
   
-  float sdSphere( vec3 p, float s ) {
-    float d1 = length(p) - s;
-    return d1;
-  }
-  
-  float atan2(in float y, in float x) {
-    bool s = (abs(x) > abs(y));
-    return mix(PI/2.0 - atan(x,y), atan(y,x), s);
-  }
-  
   // Calculate displacement
   float displacement(vec3 p) {
     float theta = map(max(length(p), 1.0), 1.0, 6.0, 0.0, 1.0);
-    
-    // Option 3: Amplitude spectrum
     int index = int(theta * float(buffSize));
     float ampVal = amplitudeSpectrum[index];
     float synthVal = synthAmpSpectrum[index];
     float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * sin((1. - theta));
-    
     return displacement;
-  }
-  
-  // Add sphere dist depending on distance from center
-  float reactiveDistance(float fractal, vec3 p) {
-    float outFloat = fractal;
-    outFloat = outFloat - displacement(p);
-        
-    return outFloat;
   }
   
   float smin(float a, float b, float k) {
@@ -130,27 +108,23 @@ export default `
     return mix(b, a, h) - k * h * (1.0-h);
   }
   
-  vec3 opTwist( vec3 p ) {
-      float k = sin(iTime / (240./bpm) * 2. * PI ); // or some other amount
-      float c = cos(k*p.y);
-      float s = sin(k*p.y);
-      mat2  m = mat2(c,-s,s,c);
-      vec3  q = vec3(m*p.xz,p.y);
-      return q;
+  float sdSphere( vec3 p, float s ) {
+    float d1 = length(p) - s;
+    return d1;
   }
   
   float metaBalls (vec3 pos) {
     float ballRadius = 0.025;
-    float k = 0.3;
-    float outVal = MaximumDistance;
+    float k = 0.2;
+    float outVal = MAX_DIST;
     vec3 bPos;
     
     int index = 0;
 
     for (float j=-0.8; j <= 0.8; j+=0.4) {
-      vec2 xy = vec2(sqrt(1.5 - j*j), 0.0) * Rotate(offsetTheta);
+      vec2 xy = vec2(sqrt(1.1 - j*j), 0.0) * rotate2d(offsetTheta);
       bPos = pos + vec3(xy.x, xy.y, j);
-      outVal = smin(outVal, sdSphere(bPos, ballRadius + map(chroma[index], minChroma, 1., 0., 1.) / 5.0), k);
+      outVal = smin(outVal, sdSphere(bPos, ballRadius + map(chroma[index], minChroma, 1., 0., 0.2)), k);
       index++;
     }
     
@@ -160,7 +134,7 @@ export default `
   
   // Calculates de distance from a position p to the scene
   float getSceneDistance (vec3 p) {
-    float fractal = reactiveDistance(mengerbrocolli(p, 6.0), p);
+    float fractal = mengerbrocolli(p, 6.0) - displacement(p);
     float balls = metaBalls(p);
     return smin(fractal, balls, 0.3);
   }
@@ -171,13 +145,11 @@ export default `
     float totalDistance = 0.0;
     float minDistToScene = 300.0;
     vec3 minDistToScenePos = ro;
-    float minDistToOrigin = 200.0;
-    vec3 minDistToOriginPos = ro;
     vec4 col = vec4 (0.0, 0.0, 0.0, 1.0);
     vec3 curPos = ro;
     bool hit = false;
   
-    for (steps = 0.0; steps < float (MaximumRaySteps); steps++) {
+    for (steps = 0.0; steps < float (MAX_RAY_STEPS); steps++) {
       vec3 p = ro + totalDistance * rd; // Current position of the ray
       float distance = getSceneDistance (p); // Distance from the current position to the scene
       curPos = ro + rd * totalDistance;
@@ -185,17 +157,16 @@ export default `
         minDistToScene = distance;
         minDistToScenePos = curPos;
       }
-      if (minDistToOrigin > length (curPos)) {
-        minDistToOrigin = length (curPos);
-        minDistToOriginPos = curPos;
-      }
+
       totalDistance += distance; // Increases the total distance ray marched
-      if (distance < MinimumDistance) {
+      
+      // If distance is smaller than MIN_DIST this is an edge
+      if (distance < MIN_DIST) {
         hit = true;
-        break; // If the ray marched more than the max steps or the max distance, breake out
-      } else if (distance > MaximumDistance) {
-        break;
-      }
+        break; 
+      } 
+      // If the ray marched more than MAX_DIST, break out
+      else if (distance > MAX_DIST) { break; }
     }
     
     if (hit) {
@@ -219,7 +190,7 @@ export default `
     vec3 ro = vec3(-iRayOrigin.x, iRayOrigin.y, iRayOrigin.z); // Ray origin
     
     vec3 lookAt = vec3(0);
-    vec3 rd = RayDirection(uv, ro, lookAt, 2.); // Ray direction (based on mouse rotation)
+    vec3 rd = calcRayDirection(uv, ro, lookAt, 2.); // Ray direction (based on mouse rotation)
 
     vec4 col = RayMarcher (ro, rd);
   

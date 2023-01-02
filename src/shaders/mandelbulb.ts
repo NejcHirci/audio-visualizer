@@ -2,9 +2,9 @@ export default `
   precision mediump float;
   
   // Ray Marching Settings
-  #define MaximumRaySteps 100
-  #define MaximumDistance 250.
-  #define MinimumDistance .001
+  #define MAX_RAY_STEPS 50
+  #define MAX_DIST 150.
+  #define MIN_DIST .001
 
   // Constants 
   #define PI 3.141592653589793238
@@ -31,13 +31,7 @@ export default `
   
   // TRANSFORM FUNCTIONS //
   
-  mat2 Rotate (float angle) {
-    float s = sin (angle);
-    float c = cos (angle);
-    return mat2 (c, -s, s, c);
-  }
-  
-  vec3 RayDirection (vec2 uv, vec3 ro, vec3 lookat, float zoom) {
+  vec3 calculateRayDir (vec2 uv, vec3 ro, vec3 lookat, float zoom) {
     vec3 f = normalize (lookat - ro),
       r = normalize (cross (vec3 (0, 1, 0), f)),
       u = cross (f, r),
@@ -66,9 +60,7 @@ export default `
     for (int i = 0; i < 10; i++) {
       r = length (z);
   
-      if (r > 2.0) {
-        break;
-      }
+      if (r > 2.0) { break; }
   
       // convert to polar coordinates
       float theta = acos (z.z / r);
@@ -91,75 +83,18 @@ export default `
     return dst;
   }
   
-  float sdSphere( vec3 p, float s ) {
-    float d1 = length(p) - s;
-    return d1;
-  }
-  
-  float atan2(in float y, in float x) {
-    bool s = (abs(x) > abs(y));
-    return mix(PI/2.0 - atan(x,y), atan(y,x), s);
-  }
-  
   // Calculate displacement
   float displacement(vec3 p) {
     float theta = map(max(length(p), 0.3), 0.3, 10.0, 0.0, 1.0);
-    
-    // Option 3: Amplitude spectrum
     int index = int(theta * float(buffSize));
     float ampVal = amplitudeSpectrum[index];
     float synthVal = synthAmpSpectrum[index];
-    float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * pow((1. - theta), 4.);
-    
-    return displacement;
+    return ((ampVal + synthVal) / 2.0) * 0.01 * pow((1. - theta), 4.);
   }
-  
-  // Add sphere dist depending on distance from center
-  float reactiveDistance(float fractal, vec3 p) {
-    float outFloat = fractal;
-    outFloat = outFloat - displacement(p);
-        
-    return outFloat;
-  }
-  
-  float smin(float a, float b, float k) {
-    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-    return mix(b, a, h) - k * h * (1.0-h);
-  }
-  
-  vec3 opTwist( vec3 p ) {
-      float k = sin(iTime / (240./bpm) * 2. * PI ); // or some other amount
-      float c = cos(k*p.y);
-      float s = sin(k*p.y);
-      mat2  m = mat2(c,-s,s,c);
-      vec3  q = vec3(m*p.xz,p.y);
-      return q;
-  }
-  
-  float metaBalls (vec3 pos) {
-    float ballRadius = 0.01;
-    float k = 0.3;
-    float outVal = MaximumDistance;
-    vec3 bPos;
-    
-    int index = 0;
-
-    for (float j=-0.8; j <= 0.8; j+=0.4) {
-      vec2 xy =  vec2(sqrt(1.0 - j*j), 0.) * Rotate(offsetTheta);
-      bPos = pos + vec3(xy.x, xy.y, j);
-      outVal = smin(outVal, sdSphere(bPos, ballRadius + map(chroma[index], minChroma, 1., 0., 1.) / 10.0), k);
-      index++;
-    }
-    
-    return outVal;
-  }
-  
   
   // Calculates de distance from a position p to the scene
   float getSceneDistance (vec3 p) {
-    float fractal = reactiveDistance(mandelbulb(p, 6.0), p);
-    float balls = metaBalls(p);
-    return smin(fractal, balls, 0.1);
+    return mandelbulb(p, 6.0) - displacement(p);
   }
   
   // Marches the ray in the scene
@@ -168,31 +103,30 @@ export default `
     float totalDistance = 0.0;
     float minDistToScene = 300.0;
     vec3 minDistToScenePos = ro;
-    float minDistToOrigin = 200.0;
-    vec3 minDistToOriginPos = ro;
     vec4 col = vec4 (0.0, 0.0, 0.0, 1.0);
     vec3 curPos = ro;
     bool hit = false;
   
-    for (steps = 0.0; steps < float (MaximumRaySteps); steps++) {
+    for (steps = 0.0; steps < float (MAX_RAY_STEPS); steps++) {
       vec3 p = ro + totalDistance * rd; // Current position of the ray
       float distance = getSceneDistance (p); // Distance from the current position to the scene
       curPos = ro + rd * totalDistance;
+      
+      // Tracked for color calculation
       if (minDistToScene > distance) {
         minDistToScene = distance;
         minDistToScenePos = curPos;
       }
-      if (minDistToOrigin > length (curPos)) {
-        minDistToOrigin = length (curPos);
-        minDistToOriginPos = curPos;
-      }
+      
       totalDistance += distance; // Increases the total distance ray marched
-      if (distance < MinimumDistance) {
+      
+      // If distance is smaller than MIN_DIST this is an edge
+      if (distance < MIN_DIST) {
         hit = true;
-        break; // If the ray marched more than the max steps or the max distance, breake out
-      } else if (distance > MaximumDistance) {
-        break;
-      }
+        break; 
+      } 
+      // If the ray marched more than MAX_DIST, break out
+      else if (distance > MAX_DIST) { break; }
     }
     
     
@@ -208,7 +142,7 @@ export default `
       col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 100.0, 5000.0);
     }
   
-    col.rgb /= steps * 0.08; // Ambeint occlusion
+    col.rgb /= steps * 0.08; // ambient occlusion approximation
   
     return col;
   }
@@ -218,7 +152,7 @@ export default `
     vec3 ro = vec3(-iRayOrigin.x, iRayOrigin.y, iRayOrigin.z); // Ray origin
     
     vec3 lookAt = vec3(0);
-    vec3 rd = RayDirection(uv, ro, lookAt, 2.); // Ray direction (based on mouse rotation)
+    vec3 rd = calculateRayDir(uv, ro, lookAt, 2.); // Ray direction (based on mouse rotation)
 
     vec4 col = RayMarcher (ro, rd);
   
