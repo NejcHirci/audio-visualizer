@@ -12,3 +12,7 @@ git clone git@github.com:NejcHirci/audio-visualizer.git
 npm install
 npm run
 ```
+
+## Known Bugs
+
+Sometimes the browser doesn't appropriately create an AudioContext in which case the site should be refreshed a couple of times.
