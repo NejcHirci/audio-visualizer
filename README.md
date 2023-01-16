@@ -15,4 +15,4 @@ npm run
 
 ## Known Bugs
 
-Sometimes the browser doesn't appropriately create an AudioContext in which case the site should be refreshed a couple of times.
+Sometimes the browser doesn't create an AudioContext in which case the site should be refreshed a couple of times.
