@@ -172,41 +172,59 @@ const SingleRow = styled.div`
 export const UserInterface = observer(() => {
   const store = useContext(ProjectStoreContext)!;
   const audioRef = useRef(null);
+  const [showUI, setShowUI] = useState(true);
+
+
+  // Add a listener to the keydown event of button F
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'KeyF') {
+      // Toggle the UI
+      setShowUI(prevState => !prevState);
+    }
+  }
 
   return (
-    <InterfaceWrapper>
+    <InterfaceWrapper style={{visibility: showUI ? "visible" : "hidden"}}>
       <ResizableDashBoard>
-        <SingleRow style={{justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "40px"}}>
-        <SelectButton>
-          <label form={'audioFile'}> Choose an audio file
-            <input onChange={(e) => {
-              store.loadAudio(audioRef, e.target.files[0])
-            }}
-                   type={'file'}
-                   id={'audioFile'}
-                   accept={'audio/*'} />
-          </label>
-        </SelectButton>
-        <ToggleButton>
-          <input id="microphone" type="checkbox" defaultChecked={true} onChange={(e) => {
-            store.toggleMic();
-          }}/>
-          <label htmlFor="microphone" className="microphone-check">
-            <span className="microphone-icon"></span>
-          </label>
-        </ToggleButton>
+        <SingleRow style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "40px" }}>
+          <SelectButton>
+            <label form={'audioFile'}> Choose an audio file
+              <input onChange={(e) => {
+                store.loadAudio(audioRef, e.target.files[0])
+              }}
+                     type={'file'}
+                     id={'audioFile'}
+                     accept={'audio/*'} />
+            </label>
+          </SelectButton>
+          <ToggleButton>
+            <input id="microphone" type="checkbox" defaultChecked={true} onChange={(e) => {
+              store.toggleMic();
+            }} />
+            <label htmlFor="microphone" className="microphone-check">
+              <span className="microphone-icon"></span>
+            </label>
+          </ToggleButton>
         </SingleRow>
-        <EffectTitle style={{verticalAlign: "middle"}}>Choose Visualization:</EffectTitle>
-        <SingleRow style={{width: "100%"}}>
-          <Dropdown data={store.visualizations} initialState={store.selectedVisualization} callback={(id:number) => store.setVisualization(id)}/>
+        <EffectTitle style={{ verticalAlign: "middle" }}>Choose Visualization:</EffectTitle>
+        <SingleRow style={{ width: "100%" }}>
+          <Dropdown data={store.visualizations} initialState={store.selectedVisualization}
+                    callback={(id: number) => store.setVisualization(id)} />
         </SingleRow>
-        <Divider/>
+        <Divider />
         <EffectTitle>Play Notes:</EffectTitle>
-        <NoteGroup/>
+        <NoteGroup />
+        <div>Hide the user interface by pressing F button.</div>
       </ResizableDashBoard>
       <AudioPlayer ref={audioRef} id={'audioPlayer'} controls={true} />
-    </InterfaceWrapper>
-  )
+    </InterfaceWrapper> );
 });
 
 const notes = ["C2", "D2", "E2", "G2", "A2", "B2",

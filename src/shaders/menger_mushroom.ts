@@ -3,7 +3,7 @@ export default `
   
   // Ray Marching Settings
   #define MAX_RAY_STEPS 50
-  #define MAX_DIST 150.
+  #define MAX_DIST 100.
   #define MIN_DIST .001
 
   // Constants 
@@ -58,7 +58,7 @@ export default `
   }
   
   float mengermushroom (vec3 z) {
-    float iterations = 20.0;
+    float iterations = 15.0;
     float Scale = 2.6 + (sin (iTime / 5.0) * 0.5);
     vec3 Offset = 0.8 * vec3 (1.0, 1.0, 1.0);
   
@@ -105,7 +105,7 @@ export default `
     int index = int(theta * float(buffSize));
     float ampVal = amplitudeSpectrum[index];
     float synthVal = synthAmpSpectrum[index];
-    float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * pow((1. - theta), 4.);
+    float displacement = ((ampVal + synthVal) / 2.0) * 0.1 * pow((1. - theta), 4.);
     
     return displacement;
   }
@@ -173,14 +173,14 @@ export default `
     }
     
     if (hit) {
-      col.rgb = vec3 (6.0 + (length (curPos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.2);
+      col.rgb = vec3 (6.0 + length (curPos), 0.76 + (perceptualSpread) * 0.1, 0.2);
       col.rgb = hsv2rgb (col.rgb);
     }
     else {
-      col.rgb = vec3 (6.0 + (length (minDistToScenePos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.2);
+      col.rgb = vec3 (6.0 + length (minDistToScenePos), 0.76 + (perceptualSpread) * 0.1, 0.2);
       col.rgb = hsv2rgb (col.rgb);
       col.rgb *= 1.0 / (minDistToScene * minDistToScene);
-      col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 1000.0, 5000.0);
+      col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 1.0, 10.0);
     }
   
     col.rgb /= steps * 0.08; // Ambeint occlusion

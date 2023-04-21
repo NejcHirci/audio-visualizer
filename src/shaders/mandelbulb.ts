@@ -3,7 +3,7 @@ export default `
   
   // Ray Marching Settings
   #define MAX_RAY_STEPS 50
-  #define MAX_DIST 150.
+  #define MAX_DIST 100.
   #define MIN_DIST .001
 
   // Constants 
@@ -87,9 +87,9 @@ export default `
   float displacement(vec3 p) {
     float theta = map(max(length(p), 0.3), 0.3, 10.0, 0.0, 1.0);
     int index = int(theta * float(buffSize));
-    float ampVal = amplitudeSpectrum[index];
+    float ampVal = mix(0.5, -0.5, amplitudeSpectrum[index]);
     float synthVal = synthAmpSpectrum[index];
-    return ((ampVal + synthVal) / 2.0) * 0.01 * pow((1. - theta), 4.);
+    return ((ampVal + synthVal) / 2.0) * 0.05f * pow((1. - theta), 4.);
   }
   
   // Calculates de distance from a position p to the scene
@@ -132,14 +132,14 @@ export default `
     
     
     if (hit) {
-      col.rgb = vec3 (6.0 + (length (curPos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.8);
+      col.rgb = vec3 (6.0 + length(curPos), 0.76 + (perceptualSpread) * 0.1, 0.8);
       col.rgb = hsv2rgb (col.rgb);
     }
     else {
-      col.rgb = vec3 (6.0 + (length (minDistToScenePos) / 0.5), 0.76 + (perceptualSpread) * 0.01, 0.8);
+      col.rgb = vec3 (6.0 + length(minDistToScenePos), 0.76 + (perceptualSpread) * 0.1, 0.8);
       col.rgb = hsv2rgb (col.rgb);
       col.rgb *= 1.0 / (minDistToScene * minDistToScene);
-      col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 100.0, 5000.0);
+      col.rgb /= map (sin((iTime * 0.01)), -1.0, 1.0, 10.0, 300.0);
     }
   
     col.rgb /= steps * 0.08; // ambient occlusion approximation

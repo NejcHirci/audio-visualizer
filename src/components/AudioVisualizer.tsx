@@ -5,17 +5,36 @@ import StatsImpl from 'stats.js'
 import { ProjectStoreContext } from '../App'
 
 // Create appropriate JSX component from js
-import { addTail, Canvas, extend, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, extend, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { Visualization } from './Visualization'
-import styled from 'styled-components'
 
 
 export const AudioVisualizer = () => {
+  const [toggle, setToggle] = useState(false)
+
+  // Toggle stats if we press 's' button
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 's') {
+        setToggle(prevState => !prevState);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggle]);
+
+
   return (
     <>
       <Suspense fallback={<div>Loading ...</div>}>
-        <AnimationCanvas/>
+        <Canvas camera={{position: [0, 0, 3]}}>
+          <CameraControls/>
+          <Suspense fallback={null}>
+            <Visualization/>
+          </Suspense>
+          {toggle && <Stats/>}
+        </Canvas>
       </Suspense>
     </>
   )
@@ -38,19 +57,6 @@ const CameraControls = () => {
       autoRotate={false}
     />
   )
-}
-
-const AnimationCanvas = () => {
-  return (
-    <Canvas camera={{position: [0, 0, 3]}}>
-      <CameraControls/>
-      <Suspense fallback={null}>
-        <Visualization/>
-      </Suspense>
-      <Stats/>
-    </Canvas>
-  )
-
 }
 
 const Stats = () => {

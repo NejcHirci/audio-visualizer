@@ -2,8 +2,8 @@ export default `
   precision mediump float;
   
   // Ray Marching Settings
-  #define MAX_RAY_STEPS 50
-  #define MAX_DIST 150.
+  #define MAX_RAY_STEPS 100
+  #define MAX_DIST 100.
   #define MIN_DIST .001
 
   // Constants 
@@ -58,7 +58,7 @@ export default `
   }
   
   float mengerbrocolli (vec3 z, float p) {
-    float iterations = 20.0;
+    float iterations = 15.0;
     float Scale = 2.421312 + (sin (iTime / 5.0) * 0.3);
     vec3 Offset = vec3 (0.7687, 1.32837, 0.0);
   

@@ -50,16 +50,16 @@ export const Visualization = observer(() => {
     let activeUniforms = meshRef.current.material.uniforms;
     activeUniforms.iTime.value =  state.clock.getElapsedTime();
     activeUniforms.iRayOrigin.value = camera.position;
-    activeUniforms.offsetTheta.value = (activeUniforms.offsetTheta.value + delta * store.bpm / 80.0) % (2 * Math.PI);
+    activeUniforms.offsetTheta.value = (activeUniforms.offsetTheta.value + 5 * delta * store.bpm / 80.0) % (2 * Math.PI);
     activeUniforms.bpm.value = store.bpm
 
     if (store.amplitudeSpectrum) {
-      let cur = store.getSmoothArray(new Float32Array(store.amplitudeSpectrum), store.prevAmpSpectrum, 0.1, false);
+      let cur = store.getSmoothArray(new Float32Array(store.amplitudeSpectrum), store.prevAmpSpectrum, 0.2, false);
       activeUniforms.amplitudeSpectrum.value = cur;
       store.prevAmpSpectrum = cur;
     }
     if (store.chroma) {
-      let cur = store.getSmoothArray(new Float32Array(store.chroma), store.prevChroma, 0.1, false);
+      let cur = store.getSmoothArray(new Float32Array(store.chroma), store.prevChroma, 0.2, false);
       activeUniforms.chroma.value = cur;
       activeUniforms.minChroma.value = Math.min(...Array.from(cur));
       store.prevChroma = cur;
@@ -70,7 +70,7 @@ export const Visualization = observer(() => {
       store.prevRms = val;
     }
     if (store.perceptualSpread) {
-      let val = store.perceptualSpread * 0.01 + 0.99 * store.prevperceptualSpread;
+      let val = store.perceptualSpread * 0.5 + 0.5 * store.prevperceptualSpread;
       activeUniforms.perceptualSpread.value = val;
       store.prevperceptualSpread = val;
     }
