@@ -23,9 +23,17 @@ export class ProjectStore {
   // Analysers
   analyserPlayer : Meyda.MeydaAnalyzer;
 
-
+  // Mic
   analyserMicAndSynth : Meyda.MeydaAnalyzer;
   synthAmpSpectrum : Float32Array;
+  prevSynthAmpSpectrum : Float32Array;
+  micRms: number = 0;
+  prevMicRms: number = 0;
+  micSpectralCentroid: number | null;
+  micPerceptualSpread: number;
+  prevMicPerceptualSpread : number = 0;
+  micChroma: Float32Array;
+  prevMicChroma: Float32Array;
 
   // Data Player
   bufferSize : number = 256;
@@ -109,10 +117,18 @@ export class ProjectStore {
       source: this.micAndSynthGain,
       bufferSize: this.bufferSize,
       featureExtractors: [
-        "amplitudeSpectrum"
+        "rms",
+        "amplitudeSpectrum",
+        "spectralCentroid",
+        "perceptualSpread",
+        "chroma"
       ],
       callback: (features:any) => {
         this.synthAmpSpectrum = features.amplitudeSpectrum;
+        this.micRms = features.rms;
+        this.micSpectralCentroid = features.spectralCentroid;
+        this.micPerceptualSpread = features.perceptualSpread;
+        this.micChroma = features.chroma;
       }
     });
     this.analyserMicAndSynth.start();
@@ -187,6 +203,13 @@ export class ProjectStore {
     if (arr && prevArr) {
       let curArrBase = Array.from(arr);
       let prevArrBase = Array.from(prevArr);
+
+      if (this.micEnabled) {
+        let curArrAvg = curArrBase.reduce((a, b) => a + b, 0) / curArrBase.length;
+        let prevArrAvg = prevArrBase.reduce((a, b) => a + b, 0) / prevArrBase.length;
+        curArrBase = curArrBase.map((x) => x / (curArrAvg + 0.1));
+        prevArrBase = prevArrBase.map((x) => x / (prevArrAvg + 0.1));
+      }
 
       if (useSavitzky) {
         curArrBase = savitzkyGolay(curArrBase, 1, {

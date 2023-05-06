@@ -1,5 +1,5 @@
 export default `
-  precision mediump float;
+  precision lowp float;
   
   // Ray Marching Settings
   #define MAX_RAY_STEPS 100
@@ -72,10 +72,9 @@ export default `
       if (z.x - z.y < 0.0) z.xy = z.yx; // fold 1
       if (z.x - z.z < 0.0) z.xz = z.zx; // fold 2
       if (z.y - z.z < 0.0) z.zy = z.yz; // fold 3
-  
-      z.yx *= rotate2d(0.436332 + map(sin(offsetTheta), -1., 1., 1., PI) * 0.9 * 0.1 + 4.9);
       
-      z.zy *= rotate2d(0.3323 * rms);
+      z.yx *= rotate2d(0.436332 + sin (iTime / 2.0) / 2.0 + 4.9);
+      z.xz *= rotate2d(cos (iTime / 2.0) / 2.0 + 5.0);
   
       z.x = z.x * Scale - Offset.x * (Scale - 1.0);
       z.y = z.y * Scale - Offset.y * (Scale - 1.0);
@@ -97,9 +96,8 @@ export default `
   float displacement(vec3 p) {
     float theta = map(max(length(p), 1.0), 1.0, 6.0, 0.0, 1.0);
     int index = int(theta * float(buffSize));
-    float ampVal = amplitudeSpectrum[index];
-    float synthVal = synthAmpSpectrum[index];
-    float displacement = ((ampVal + synthVal) / 2.0) * 0.01 * sin((1. - theta));
+    float ampVal = mix(0.0, 1.0, amplitudeSpectrum[index]);
+    float displacement = ampVal * 0.02 * sin((1. - theta));
     return displacement;
   }
   
@@ -170,14 +168,14 @@ export default `
     }
     
     if (hit) {
-      col.rgb = vec3 (1.0 + (length (curPos)), 0.76 + (perceptualSpread) * 0.01, 0.3 + 0.1 * (rms));
+      col.rgb = vec3 (6.0 + length(curPos) + mix(-0.5, 0.5, perceptualSpread) * 0.1, 0.76 + (perceptualSpread) * 0.5, 0.4);
       col.rgb = hsv2rgb (col.rgb);
     }
     else {
-      col.rgb = vec3 (1.0 + (length (minDistToScenePos)), 0.76 + (perceptualSpread) * 0.01, 0.3 + 0.1 * (rms));
+      col.rgb = vec3 (6.0 + length(minDistToScenePos) + mix(-0.5, 0.5, perceptualSpread) * 0.1, 0.76 + (perceptualSpread) * 0.5, 0.4);
       col.rgb = hsv2rgb (col.rgb);
-      col.rgb *= 1.0 / (minDistToScene * minDistToScene);
-      col.rgb /= map (sin((iTime * perceptualSpread * 0.01)), -1.0, 1.0, 500.0, 1000.0);
+      col.rgb *= 10.0 / (minDistToScene * minDistToScene);
+      col.rgb /= map (sin((iTime + perceptualSpread * 0.01)), -1.0, 1.0, 10.0, 1000.0);
     }
   
     col.rgb /= steps * 0.08; // Ambeint occlusion

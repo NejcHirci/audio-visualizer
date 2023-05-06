@@ -50,36 +50,54 @@ export const Visualization = observer(() => {
     let activeUniforms = meshRef.current.material.uniforms;
     activeUniforms.iTime.value =  state.clock.getElapsedTime();
     activeUniforms.iRayOrigin.value = camera.position;
-    activeUniforms.offsetTheta.value = (activeUniforms.offsetTheta.value + 5 * delta * store.bpm / 80.0) % (2 * Math.PI);
+    activeUniforms.offsetTheta.value = (activeUniforms.offsetTheta.value + 3 * delta * store.bpm / 60.0) % (2 * Math.PI);
     activeUniforms.bpm.value = store.bpm
 
-    if (store.amplitudeSpectrum) {
-      let cur = store.getSmoothArray(new Float32Array(store.amplitudeSpectrum), store.prevAmpSpectrum, 0.2, false);
+    if (store.amplitudeSpectrum && !store.micEnabled) {
+      let cur = store.getSmoothArray(new Float32Array(store.amplitudeSpectrum), store.prevAmpSpectrum, 0.1, true);
       activeUniforms.amplitudeSpectrum.value = cur;
       store.prevAmpSpectrum = cur;
     }
     if (store.chroma) {
-      let cur = store.getSmoothArray(new Float32Array(store.chroma), store.prevChroma, 0.2, false);
+      let cur;
+      if (store.micEnabled) {
+        cur = store.getSmoothArray(new Float32Array(store.micChroma), store.prevMicChroma, 0.2, false);
+        store.prevMicChroma = cur;
+      } else {
+        cur = store.getSmoothArray(new Float32Array(store.chroma), store.prevChroma, 0.2, false);
+        store.prevChroma = cur;
+      }
       activeUniforms.chroma.value = cur;
       activeUniforms.minChroma.value = Math.min(...Array.from(cur));
       store.prevChroma = cur;
     }
     if (store.rms) {
-      let val = store.rms * 0.5 + 0.5 * store.prevRms
+      let val;
+      if (store.micEnabled) {
+          val = store.micRms * 0.5 + 0.5 * store.prevMicRms;
+          store.prevMicRms = val;
+      } else {
+          val = store.rms * 0.5 + 0.5 * store.prevRms;
+          store.prevRms = val;
+      }
       activeUniforms.rms.value = val;
-      store.prevRms = val;
     }
     if (store.perceptualSpread) {
-      let val = store.perceptualSpread * 0.5 + 0.5 * store.prevperceptualSpread;
+      let val;
+      if (store.micEnabled) {
+        val = store.micPerceptualSpread * 0.5 + 0.5 * store.prevperceptualSpread;
+        store.prevMicPerceptualSpread = val;
+      } else {
+        val = store.perceptualSpread * 0.5 + 0.5 * store.prevperceptualSpread;
+        store.prevperceptualSpread = val;
+      }
       activeUniforms.perceptualSpread.value = val;
-      store.prevperceptualSpread = val;
     }
-    if (store.synthAmpSpectrum) {
-      let cur = Array.from(store.synthAmpSpectrum);
-      activeUniforms.synthAmpSpectrum.value = new Float32Array(savitzkyGolay(cur, 1,
-        {derivative: 0, pad: 'post', padValue: 'replicate'}));
+    if (store.synthAmpSpectrum && store.micEnabled) {
+      let cur = store.getSmoothArray(new Float32Array(store.synthAmpSpectrum), store.prevSynthAmpSpectrum, 0.15, true);
+      activeUniforms.amplitudeSpectrum.value = cur;
+      store.prevSynthAmpSpectrum = cur;
     }
-
   })
 
   return (

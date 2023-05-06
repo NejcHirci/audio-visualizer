@@ -1,5 +1,5 @@
 export default `
-  precision mediump float;
+  precision lowp float;
   
   // Ray Marching Settings
   #define MAX_RAY_STEPS 50
@@ -88,8 +88,7 @@ export default `
     float theta = map(max(length(p), 0.3), 0.3, 10.0, 0.0, 1.0);
     int index = int(theta * float(buffSize));
     float ampVal = mix(0.5, -0.5, amplitudeSpectrum[index]);
-    float synthVal = synthAmpSpectrum[index];
-    return ((ampVal + synthVal) / 2.0) * 0.05f * pow((1. - theta), 4.);
+    return ampVal * 0.02f * pow((1. - theta), 4.);
   }
   
   // Calculates de distance from a position p to the scene
